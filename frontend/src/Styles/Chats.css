@@ -1404,3 +1404,241 @@
     border-radius: 32px;
   }
 }
+
+/* =========================================================
+   REPLY UI + MULTI-LINE MESSAGE COMPOSER
+   Added without changing the existing visual theme.
+========================================================= */
+
+.messages-end {
+  width: 1px;
+  height: 1px;
+  flex-shrink: 0;
+}
+
+.message-bubble .message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.message-reply-preview {
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 3px;
+  padding: 2px 0;
+  min-width: 0;
+}
+
+.message-reply-bar {
+  width: 3px;
+  flex: 0 0 3px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.message-reply-content {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.message-reply-content span {
+  display: block;
+  margin-bottom: 2px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.message-reply-content p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.received-bubble .message-reply-bar {
+  background: #6f91ff;
+}
+
+.received-bubble .message-reply-content span {
+  color: #8fa9ff;
+}
+
+.received-bubble .message-reply-content p {
+  color: #aeb8c8;
+}
+
+.message-composer {
+  position: relative;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 8px 13px;
+}
+
+.reply-preview {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 5px 9px;
+  margin-bottom: 1px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.reply-preview-content {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  color: #7d9aff;
+}
+
+.reply-preview-content > svg {
+  flex: 0 0 auto;
+}
+
+.reply-preview-content > div {
+  min-width: 0;
+}
+
+.reply-preview-content span {
+  display: block;
+  color: #86a2ff;
+  font-size: 11px;
+  font-weight: 650;
+  margin-bottom: 2px;
+}
+
+.reply-preview-content p {
+  margin: 0;
+  color: #b6c0cf;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reply-cancel-button {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  color: #aab4c4;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.reply-cancel-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.composer-input-row {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.message-composer textarea {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  min-height: 24px;
+  max-height: 120px;
+  resize: none;
+  overflow-y: auto;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: white;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  padding: 3px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #293344 transparent;
+}
+
+.message-composer textarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+.message-composer textarea::-webkit-scrollbar-thumb {
+  background: #293344;
+  border-radius: 10px;
+}
+
+.message-composer textarea::placeholder {
+  color: #7f8999;
+}
+
+.light-mode .message-composer textarea {
+  color: #11151d;
+}
+
+.light-mode .message-composer textarea::placeholder {
+  color: #7a8392;
+}
+
+.light-mode .reply-preview {
+  border-bottom-color: rgba(17, 21, 29, 0.09);
+}
+
+.light-mode .reply-preview-content p {
+  color: #687182;
+}
+
+.light-mode .reply-cancel-button {
+  color: #657083;
+}
+
+.light-mode .message-reply-content span {
+  color: #64708a;
+}
+
+.light-mode .message-reply-content p {
+  color: #526078;
+}
+
+@media (max-width: 800px) {
+  .message-composer {
+    padding: 7px 12px;
+    border-radius: 31px;
+  }
+
+  .composer-input-row {
+    min-height: 48px;
+    gap: 8px;
+  }
+
+  .message-composer textarea {
+    max-height: 110px;
+    font-size: 15px;
+  }
+
+  .reply-preview {
+    padding-top: 5px;
+    padding-bottom: 7px;
+  }
+
+  .reply-preview-content p {
+    max-width: 62vw;
+  }
+}

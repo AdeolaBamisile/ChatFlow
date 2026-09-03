@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Send,
@@ -13,6 +13,8 @@ import {
   Phone,
   Video,
   ArrowLeft,
+  X,
+  Reply,
 } from "lucide-react";
 import type {
   Chat,
@@ -191,6 +193,7 @@ const Chats = () => {
   const [search, setSearch] = useState("");
   const [activeMessageId, setActiveMessageId] = useState<number | null>(null);
   const [reply, setReply] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const filterOptions: FilterOptions[] = ["All", "Unread", "Pinned", "Muted"];
 
@@ -221,6 +224,15 @@ const Chats = () => {
     setActiveMessageId((prev) => (prev === id ? null : id));
   };
 
+  // Keep the conversation anchored to the newest message. This also runs
+  // when a new reply/message is added so the latest content is always visible.
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [messages]);
+
   const sendMessage = () => {
     if (!message.trim()) return;
 
@@ -230,7 +242,7 @@ const Chats = () => {
     });
 
     const newMessage: NewSentMessage = {
-      id: message.length + 1,
+      id: messages.length + 1,
       message,
       time,
       reply,
@@ -238,12 +250,25 @@ const Chats = () => {
       seen: false,
     };
 
+    console.log(newMessage);
+
     setMessages(messages.concat(newMessage));
     setMessage("");
+    setReply(null);
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter") return;
+
+    // Phones/tablets in portrait should use Enter for a new line because
+    // their keyboards do not provide a Shift+Enter equivalent.
+    const isSmallScreen = window.matchMedia("(max-width: 800px)").matches;
+
+    if (isSmallScreen) return;
+
+    // Desktop/laptop: Enter sends, Shift+Enter creates a new line.
+    if (!event.shiftKey) {
+      event.preventDefault();
       sendMessage();
     }
   };
@@ -374,6 +399,7 @@ const Chats = () => {
                 time={message.time}
                 id={message.id}
                 setReply={setReply}
+                reply={message.reply}
               />
             ) : (
               <SentMessage
@@ -385,36 +411,69 @@ const Chats = () => {
                 id={message.id}
                 seen={message.seen}
                 setReply={setReply}
+                reply={message.reply}
               />
             ),
           )}
+          <div
+            ref={messagesEndRef}
+            className="messages-end"
+            aria-hidden="true"
+          />
         </div>
 
         {/* Message Composer */}
-        <div className="message-composer">
-          <button className="composer-button" title="Attach file">
-            <Paperclip size={24} />
-          </button>
+        <div className={`message-composer ${reply ? "replying" : ""}`}>
+          {reply && (
+            <div className="reply-preview">
+              <div className="reply-preview-content">
+                <Reply size={17} />
+                <div>
+                  <span>Replying to message</span>
+                  <p>{reply}</p>
+                </div>
+              </div>
 
-          <input
-            type="text"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-          />
-
-          <div className="composer-actions">
-            <button title="Voice message">
-              <Mic size={24} />
-            </button>
-          </div>
-
-          {message.trim() && (
-            <button className="send-button" onClick={sendMessage}>
-              <Send size={19} />
-            </button>
+              <button
+                className="reply-cancel-button"
+                title="Cancel reply"
+                aria-label="Cancel reply"
+                onClick={() => setReply(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
           )}
+
+          <div className="composer-input-row">
+            <button className="composer-button" title="Attach file">
+              <Paperclip size={24} />
+            </button>
+
+            <textarea
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              rows={1}
+            />
+
+            <div className="composer-actions">
+              <button title="Voice message">
+                <Mic size={24} />
+              </button>
+            </div>
+
+            {message.trim() && (
+              <button
+                className="send-button"
+                onClick={sendMessage}
+                title="Send message"
+              >
+                <Send size={19} />
+              </button>
+            )}
+          </div>
         </div>
       </main>
 

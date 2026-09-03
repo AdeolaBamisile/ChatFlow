@@ -7,11 +7,26 @@ interface BaseMessageBubbleProps {
   time: string;
   id: number;
   setReply: React.Dispatch<React.SetStateAction<string | null>>;
+  reply?: string | null;
 }
 
 interface SentMessageBubbleProps extends BaseMessageBubbleProps {
   seen: boolean;
 }
+
+const ReplyPreview = ({ reply }: { reply?: string | null }) => {
+  if (!reply) return null;
+
+  return (
+    <div className="message-reply-preview">
+      <div className="message-reply-bar" />
+      <div className="message-reply-content">
+        <span>Replying to</span>
+        <p>{reply}</p>
+      </div>
+    </div>
+  );
+};
 
 export const RecievedMessage = ({
   toggleMessageActions,
@@ -20,16 +35,18 @@ export const RecievedMessage = ({
   time,
   id,
   setReply,
+  reply,
 }: BaseMessageBubbleProps) => {
   return (
     <div className="message-row received">
       <div className="message-stack">
         <div className="message-bubble-wrapper">
           <div
-            className={`message-bubble received-bubble`}
+            className="message-bubble received-bubble"
             onClick={() => toggleMessageActions(id)}
           >
-            <span>{message}</span>
+            <ReplyPreview reply={reply} />
+            <span className="message-text">{message}</span>
             <small>{time}</small>
           </div>
 
@@ -39,7 +56,10 @@ export const RecievedMessage = ({
             <button
               className="bubble-action-btn"
               title="Reply"
-              onClick={() => setReply(message)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setReply(message);
+              }}
             >
               <Reply size={15} />
             </button>
@@ -68,6 +88,7 @@ export const SentMessage = ({
   id,
   seen,
   setReply,
+  reply,
 }: SentMessageBubbleProps) => {
   return (
     <div className="message-row sent">
@@ -81,7 +102,7 @@ export const SentMessage = ({
               title="Reply"
               onClick={(e) => {
                 e.stopPropagation();
-                console.log(`Reply to ${id}`);
+                setReply(message);
               }}
             >
               <Reply size={15} />
@@ -89,7 +110,10 @@ export const SentMessage = ({
             <button
               className="bubble-action-btn"
               title="React"
-              onClick={() => setReply(message)}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log(`React to ${id}`);
+              }}
             >
               <Smile size={15} />
             </button>
@@ -99,7 +123,8 @@ export const SentMessage = ({
             className="message-bubble sent-bubble"
             onClick={() => toggleMessageActions(id)}
           >
-            <span>{message}</span>
+            <ReplyPreview reply={reply} />
+            <span className="message-text">{message}</span>
             <small>
               {time} {seen ? <CheckCheck size={14} /> : <Check size={14} />}
             </small>
