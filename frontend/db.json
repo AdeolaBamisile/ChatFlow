@@ -1,0 +1,17 @@
+{
+  "users": [
+    {
+      "name": "ola",
+      "email": "ola@ola.ola",
+      "password": "ola",
+      "id": "XCX4NZhRVBU"
+    },
+    {
+      "name": "Olaa",
+      "email": "se@re",
+      "password": "secret",
+      "id": "08tUMUoYak0"
+    }
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
+}
