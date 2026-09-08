@@ -1,5 +1,11 @@
 export type Theme = "dark" | "light";
-export type AccentColor = "blue" | "purple" | "pink" | "green" | "orange" | "cyan";
+export type AccentColor =
+  | "blue"
+  | "purple"
+  | "pink"
+  | "green"
+  | "orange"
+  | "cyan";
 
 export interface User {
   id: string;
