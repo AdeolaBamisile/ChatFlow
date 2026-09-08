@@ -2,13 +2,14 @@ interface InputBoxProps {
   type: string;
   value: string;
   setValue: React.Dispatch<React.SetStateAction<string>>;
+  placeholder: string;
 }
 
-const InputBox = ({ type, value, setValue }: InputBoxProps) => {
+const InputBox = ({ type, value, setValue, placeholder }: InputBoxProps) => {
   return (
     <input
       type={type}
-      placeholder="Enter your full name"
+      placeholder={`Enter ${placeholder}`}
       value={value}
       onChange={(e) => setValue(e.target.value)}
     />

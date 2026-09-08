@@ -1,5 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  useApolloClient,
+  useMutation,
+  useQuery,
+  useSubscription,
+} from "@apollo/client/react";
+
 import { useNavigate, useParams } from "react-router-dom";
+
 import {
   Send,
   Search,
@@ -9,482 +18,757 @@ import {
   Bell,
   Pin,
   Ban,
-  Folder,
   Phone,
   Video,
   ArrowLeft,
   X,
-  Reply,
+  ChevronDown,
+  ChevronUp,
+  SearchIcon,
 } from "lucide-react";
+
+import {
+  BLOCK_USER_MUTATION,
+  CHAT_MESSAGE_SUBSCRIPTION,
+  CHAT_UPDATED_SUBSCRIPTION,
+  CHATS_QUERY,
+  DELETE_MESSAGE_MUTATION,
+  MEDIA_QUERY,
+  MESSAGES_QUERY,
+  REACT_MESSAGE_MUTATION,
+  SEND_GEMINI_MESSAGE_MUTATION,
+  SEND_MESSAGE_MUTATION,
+  UPDATE_CHAT_MUTATION,
+} from "../services/graphql";
+
+import UserButton from "../Components/ChatsSpecific/UserButton";
+import FilterButtons from "../Components/ChatsSpecific/FilterButtons";
+import { MessageBubble } from "../Components/ChatsSpecific/MessageBubble";
+
+import { useCurrentUser } from "../store";
+import { useMediaUpload } from "../services/media";
+
 import type {
   Chat,
   Message,
-  ChatFilterOptions as FilterOptions,
-  SentMessage as NewSentMessage,
+  ChatFilterOptions,
+  MessageAttachment,
+  GeminiMessage,
 } from "../types";
-import UserButton from "../Components/ChatsSpecific/UserButton";
-import FilterButtons from "../Components/ChatsSpecific/FilterButtons";
 
-import {
-  RecievedMessage,
-  SentMessage,
-} from "../Components/ChatsSpecific/MessageBubble";
+const GeminiIcon =
+  "https://rholprurkjaqsgdwywid.supabase.co/storage/v1/object/public/testing/projectImagesVideos/Gemini-Icon.png";
 
-const chats: Chat[] = [
-  {
-    id: 1,
-    name: "Alex Johnson",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=AlexJohnson",
-    preview: "Sounds good! Let's do it",
-    time: "10:30 AM",
-    unread: 1,
-    online: true,
-    pinned: true,
-    muted: true,
-  },
-  {
-    id: 2,
-    name: "Feyi Grace",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=FeyiGrace",
-    preview: "You: Okay perfect 👏",
-    time: "9:45 AM",
-    unread: 1,
-    online: false,
-  },
-  {
-    id: 3,
-    name: "MarvelTheAbstract",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=MarvelAbstract",
-    preview: "I sent you the file",
-    time: "9:15 AM",
-    online: true,
-  },
-  {
-    id: 4,
-    name: "Okeowo Tofunmi",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=Okeowo",
-    preview: "You: See you there!",
-    time: "8:50 AM",
-    unread: 3,
-    online: true,
-  },
-  {
-    id: 5,
-    name: "Bassey - Marvin",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=BasseyMarvin",
-    preview: "React is awesome!",
-    time: "Yesterday",
-    online: true,
-  },
-  {
-    id: 6,
-    name: "One's and Two's",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=OneAndTwos",
-    preview: "You: Haha true",
-    time: "Yesterday",
-    online: true,
-  },
-  {
-    id: 7,
-    name: "Justjack_12",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=Justjack",
-    preview: "Attachment",
-    time: "Yesterday",
-    online: false,
-  },
-  {
-    id: 8,
-    name: "King Daystar",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=KingDaystar",
-    preview: "You: Appreciate it!",
-    time: "Mon",
-    online: true,
-  },
-  {
-    id: 9,
-    name: "Creatives Hub",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=CreativesHub",
-    preview: "Tosin: Great work team 👏",
-    time: "Mon",
-    muted: true,
-    online: false,
-  },
-  {
-    id: 10,
-    name: "Design Squad",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=DesignSquad",
-    preview: "Jane: Nice one!",
-    time: "Sun",
-    online: true,
-  },
-];
-
-const Messages: Message[] = [
-  {
-    id: 1,
-    message: "Hey! 👋",
-    time: "10.02 AM",
-    type: "recieved",
-    reply: null,
-  },
-  {
-    id: 2,
-    message: "How are you doing?",
-    time: "10.02 AM",
-    type: "recieved",
-    reply: null,
-  },
-  {
-    id: 3,
-    message: "Hi Alex! I'm good, thanks 🚀",
-    time: "10.03 AM",
-    type: "sent",
-    seen: true,
-    reply: null,
-  },
-  {
-    id: 4,
-    message: "How about you?",
-    time: "10.03 AM",
-    type: "sent",
-    seen: true,
-    reply: null,
-  },
-  {
-    id: 5,
-    message:
-      "I'm doing great, Just working on the new project. Will share the updates soon",
-    time: "10.05 AM",
-    type: "recieved",
-    reply: null,
-  },
-  {
-    id: 6,
-    message: "Awesome, can't wait to see it. Let me know if you need anything.",
-    time: "10.07 AM",
-    type: "sent",
-    seen: true,
-    reply: null,
-  },
-  {
-    id: 7,
-    message: "Thanks, will do👍",
-    time: "10.08 AM",
-    type: "recieved",
-    reply: null,
-  },
-];
+type ChatQueryData = { chats: Chat[] };
+type MessagesData = { messages: Message[] };
+type MediaData = { chatMedia: MessageAttachment[] };
+type SendGeminiMessageData = {
+  sendGeminiMessage: GeminiMessage;
+};
 
 const Chats = () => {
-  const navigate = useNavigate();
-  const { chatId } = useParams<{ chatId: string }>();
+  const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const [message, setMessage] = useState("");
+  const [activeFilter, setActiveFilter] = useState<ChatFilterOptions>("All");
+  const [showDetails, setShowDetails] = useState(false);
+  const [chatListSearch, setChatListSearch] = useState("");
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [reply, setReply] = useState<Message | null>(null);
+  const [showChatSearch, setShowChatSearch] = useState(false);
+  const [chatSearch, setChatSearch] = useState("");
+  const [searchMatches, setSearchMatches] = useState<string[]>([]);
+  const [searchMatchIndex, setSearchMatchIndex] = useState(0);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [showGemini, setShowGemini] = useState(false);
+  const [showMediaOverlay, setShowMediaOverlay] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<MessageAttachment | null>(
+    null,
+  );
+  const [geminiInput, setGeminiInput] = useState("");
+  const [geminiMessages, setGeminiMessages] = useState<GeminiMessage[]>([]);
+  const [isGeminiSending, setIsGeminiSending] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
 
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
+
+  const { chatId } = useParams<{ chatId: string }>();
+  const currentUser = useCurrentUser();
+  const client = useApolloClient();
   const isChatRoute = Boolean(chatId);
 
-  const [activeChat, setActiveChat] = useState<Chat>(() => {
-    const id = Number(chatId);
-    return chats.find((chat) => chat.id === id) ?? chats[0];
+  const navigate = useNavigate();
+
+  const {
+    data: chatsData,
+    loading: chatsLoading,
+    error: chatsError,
+  } = useQuery<ChatQueryData>(CHATS_QUERY);
+
+  const chats = chatsData?.chats ?? [];
+
+  const selectedChat = useMemo(
+    () =>
+      chatId
+        ? (chats.find((chat) => chat.id === chatId) ?? activeChat)
+        : activeChat,
+    [activeChat, chatId, chats],
+  );
+
+  const { data: messagesData } = useQuery<MessagesData>(MESSAGES_QUERY, {
+    variables: { chatId: selectedChat?.id ?? "" },
+    skip: !selectedChat,
+    fetchPolicy: "cache-and-network",
   });
 
-  const [messages, setMessages] = useState<Message[]>(Messages);
-  const [message, setMessage] = useState("");
-  const [activeFilter, setActiveFilter] = useState<FilterOptions>("All");
-  const [showDetails, setShowDetails] = useState(false);
-  const [search, setSearch] = useState("");
-  const [activeMessageId, setActiveMessageId] = useState<number | null>(null);
-  const [reply, setReply] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  const filterOptions: FilterOptions[] = ["All", "Unread", "Pinned", "Muted"];
-
-  const searchedChat = chats.filter((chat) => {
-    const searched = search.toLocaleLowerCase().trim();
-    return chat.name.toLocaleLowerCase().includes(searched);
+  const { data: mediaData } = useQuery<MediaData>(MEDIA_QUERY, {
+    variables: { chatId: selectedChat?.id ?? "" },
+    skip: !selectedChat,
   });
 
-  const ChatsToShow: Chat[] = searchedChat.filter((chat) => {
-    if (activeFilter === "Unread") return (chat.unread ?? 0) > 0;
-    else if (activeFilter === "Pinned") return chat.pinned;
-    else if (activeFilter === "Muted") return chat.muted;
-    return chat;
+  const [updateChat] = useMutation(UPDATE_CHAT_MUTATION, {
+    refetchQueries: [{ query: CHATS_QUERY }],
+  });
+
+  const [sendMessage] = useMutation(SEND_MESSAGE_MUTATION);
+  const [deleteMessage] = useMutation(DELETE_MESSAGE_MUTATION);
+  const [reactMessage] = useMutation(REACT_MESSAGE_MUTATION);
+  const [blockUser] = useMutation(BLOCK_USER_MUTATION, {
+    refetchQueries: [{ query: CHATS_QUERY }],
+  });
+
+  const [sendGemini] = useMutation<SendGeminiMessageData>(
+    SEND_GEMINI_MESSAGE_MUTATION,
+  );
+
+  const { upload } = useMediaUpload();
+
+  const messages = messagesData?.messages ?? [];
+
+  const media =
+    mediaData?.chatMedia ??
+    messages.flatMap((item) =>
+      item.attachment
+        ? [
+            {
+              ...item.attachment,
+              messageId: item.id,
+              createdAt: item.createdAt,
+            },
+          ]
+        : [],
+    );
+
+  useSubscription(CHAT_MESSAGE_SUBSCRIPTION, {
+    variables: { chatId: selectedChat?.id ?? "" },
+    skip: !selectedChat,
+    onData: () => {
+      void client.refetchQueries({
+        include: [MESSAGES_QUERY, MEDIA_QUERY, CHATS_QUERY],
+      });
+    },
+  });
+
+  useSubscription(CHAT_UPDATED_SUBSCRIPTION, {
+    onData: () => {
+      void client.refetchQueries({ include: [CHATS_QUERY] });
+    },
   });
 
   useEffect(() => {
-    if (!chatId) return;
+    if (selectedChat) setActiveChat(selectedChat);
+  }, [selectedChat]);
 
-    const id = Number(chatId);
-    const selectedChat = chats.find((chat) => chat.id === id);
-
-    if (selectedChat) {
-      setActiveChat(selectedChat);
-    }
-  }, [chatId]);
-
-  const toggleMessageActions = (id: number) => {
-    setActiveMessageId((prev) => (prev === id ? null : id));
-  };
-
-  // Keep the conversation anchored to the newest message. This also runs
-  // when a new reply/message is added so the latest content is always visible.
   useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "instant",
+      block: "end",
+    });
+  }, [messages.length]);
+
+  useEffect(
+    () => () => {
+      if (recordingTimerRef.current)
+        window.clearInterval(recordingTimerRef.current);
+      mediaRecorderRef.current?.stream
+        .getTracks()
+        .forEach((track) => track.stop());
+    },
+    [],
+  );
+
+  const filteredChats = useMemo(() => {
+    const term = chatListSearch.trim().toLowerCase();
+
+    return [...chats]
+      .filter((chat) => {
+        if (
+          term &&
+          !chat.friend.name.toLowerCase().includes(term) &&
+          !chat.friend.username.toLowerCase().includes(term)
+        )
+          return false;
+        if (activeFilter === "Unread") return chat.unreadCount > 0;
+        if (activeFilter === "Pinned") return chat.pinned;
+        if (activeFilter === "Muted") return chat.muted;
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          Number(b.pinned) - Number(a.pinned) ||
+          new Date(b.lastMessageAt).getTime() -
+            new Date(a.lastMessageAt).getTime(),
+      );
+  }, [activeFilter, chatListSearch, chats]);
+
+  const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "end",
     });
-  }, [messages]);
 
-  const sendMessage = () => {
-    if (!message.trim()) return;
-
-    const time = new Date().toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
+  const toggleChatSetting = async (field: "muted" | "pinned") => {
+    if (!selectedChat) return;
+    await updateChat({
+      variables: { chatId: selectedChat.id, [field]: !selectedChat[field] },
     });
+    if (window.matchMedia("(max-width: 800px)").matches) setShowDetails(false);
+  };
 
-    const newMessage: NewSentMessage = {
-      id: messages.length + 1,
-      message,
-      time,
-      reply,
-      type: "sent",
-      seen: false,
+  const runMessageSearch = () => {
+    const term = chatSearch.trim().toLowerCase();
+
+    const matches = term
+      ? messages
+          .filter((item) => item.content.toLowerCase().includes(term))
+          .map((item) => item.id)
+      : [];
+
+    setSearchMatches(matches);
+    setSearchMatchIndex(0);
+    if (matches[0])
+      document
+        .querySelector(`[data-message-id="${matches[0]}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const moveSearchMatch = (direction: "next" | "previous") => {
+    if (!searchMatches.length) return;
+    const next =
+      direction === "next"
+        ? (searchMatchIndex + 1) % searchMatches.length
+        : (searchMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+    setSearchMatchIndex(next);
+    document
+      .querySelector(`[data-message-id="${searchMatches[next]}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const closeChatSearch = () => {
+    setShowChatSearch(false);
+    setChatSearch("");
+    setSearchMatches([]);
+    setSearchMatchIndex(0);
+  };
+
+  const sendTextMessage = async () => {
+    if (
+      !selectedChat ||
+      !message.trim() ||
+      selectedChat.blockedByFriend ||
+      recording
+    )
+      return;
+
+    const content = message.trim();
+    setMessage("");
+    const replyId = reply?.id ?? null;
+    setReply(null);
+    await sendMessage({
+      variables: {
+        chatId: selectedChat.id,
+        content,
+        type: "text",
+        replyToId: replyId,
+        attachmentId: null,
+      },
+      refetchQueries: [
+        { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
+        { query: CHATS_QUERY },
+      ],
+    });
+  };
+
+  const sendAttachment = async (file: File) => {
+    if (
+      !selectedChat ||
+      selectedChat.blockedByFriend ||
+      !(file.type.startsWith("image/") || file.type.startsWith("video/"))
+    )
+      return;
+
+    const attachmentId = await upload(selectedChat.id, file);
+    const type = file.type.startsWith("image/") ? "image" : "video";
+    const replyId = reply?.id ?? null;
+    await sendMessage({
+      variables: {
+        chatId: selectedChat.id,
+        content: "",
+        type,
+        replyToId: replyId,
+        attachmentId,
+      },
+      refetchQueries: [
+        { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
+        { query: MEDIA_QUERY, variables: { chatId: selectedChat.id } },
+        { query: CHATS_QUERY },
+      ],
+    });
+    setReply(null);
+  };
+
+  const startRecording = async () => {
+    if (
+      !selectedChat ||
+      selectedChat.blockedByFriend ||
+      recording ||
+      !navigator.mediaDevices?.getUserMedia
+    )
+      return;
+
+    let stream: MediaStream;
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setRecording(false);
+      return;
+    }
+
+    let recorder: MediaRecorder;
+
+    try {
+      const preferredType = MediaRecorder.isTypeSupported(
+        "audio/webm;codecs=opus",
+      )
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      recorder = new MediaRecorder(stream, { mimeType: preferredType });
+    } catch {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+
+    recordingChunksRef.current = [];
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) recordingChunksRef.current.push(event.data);
     };
 
-    console.log(newMessage);
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      if (!recordingChunksRef.current.length) {
+        setRecording(false);
+        return;
+      }
 
-    setMessages(messages.concat(newMessage));
-    setMessage("");
-    setReply(null);
+      const blob = new Blob(recordingChunksRef.current, {
+        type: recorder.mimeType || "audio/webm",
+      });
+
+      const file = new File([blob], `voice-${Date.now()}.webm`, {
+        type: blob.type,
+      });
+
+      try {
+        const attachmentId = await upload(selectedChat.id, file);
+        await sendMessage({
+          variables: {
+            chatId: selectedChat.id,
+            content: "",
+            type: "voice",
+            replyToId: reply?.id ?? null,
+            attachmentId,
+          },
+          refetchQueries: [
+            { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
+            { query: CHATS_QUERY },
+          ],
+        });
+        setReply(null);
+      } finally {
+        setRecording(false);
+      }
+    };
+
+    mediaRecorderRef.current = recorder;
+    recorder.start();
+    setRecording(true);
+    setRecordingSeconds(0);
+    recordingTimerRef.current = window.setInterval(
+      () => setRecordingSeconds((seconds) => seconds + 1),
+      1000,
+    );
+  };
+
+  const stopRecording = () => {
+    if (recordingTimerRef.current)
+      window.clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    mediaRecorderRef.current?.stop();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter") return;
-
-    // Phones/tablets in portrait should use Enter for a new line because
-    // their keyboards do not provide a Shift+Enter equivalent.
-    const isSmallScreen = window.matchMedia("(max-width: 800px)").matches;
-
-    if (isSmallScreen) return;
-
-    // Desktop/laptop: Enter sends, Shift+Enter creates a new line.
+    if (window.matchMedia("(max-width: 800px)").matches) return;
     if (!event.shiftKey) {
       event.preventDefault();
-      sendMessage();
+      void sendTextMessage();
     }
   };
 
+  const sendGeminiMessage = async () => {
+    if (!geminiInput.trim() || isGeminiSending) return;
+    const content = geminiInput.trim();
+    setGeminiInput("");
+    setIsGeminiSending(true);
+    try {
+      const result = await sendGemini({
+        variables: { content, chatId: selectedChat?.id ?? null },
+      });
+      const message = result.data?.sendGeminiMessage;
+
+      if (message) setGeminiMessages((current) => [...current, message]);
+    } finally {
+      setIsGeminiSending(false);
+    }
+  };
+
+  const isBlocked = (chat: Chat) => Boolean(chat.blockedByFriend);
+
   return (
     <div
-      className={`messaging-page ${
-        isChatRoute ? "chat-route" : "list-route"
-      } ${showDetails ? "details-open" : "details-closed"}`}
+      className={`messaging-page ${isChatRoute ? "chat-route" : "list-route"} ${showDetails ? "details-open" : "details-closed"}`}
     >
       <section className="chat-list-panel">
         <h1 className="chat-list-header">Chats</h1>
-
-        {/* Search */}
         <div className="search-box">
           <Search size={20} />
           <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={chatListSearch}
+            onChange={(event) => setChatListSearch(event.target.value)}
             placeholder="Search people..."
           />
         </div>
 
-        {/* Filters */}
         <div className="chat-filters">
-          {filterOptions.map((filter) => (
-            <FilterButtons
-              key={filter}
-              filter={filter}
-              activeFilter={activeFilter}
-              setActiveFilter={setActiveFilter}
-            />
-          ))}
+          {(["All", "Unread", "Pinned", "Muted"] as ChatFilterOptions[]).map(
+            (filterOption) => (
+              <FilterButtons
+                key={filterOption}
+                filter={filterOption}
+                activeFilter={activeFilter}
+                setActiveFilter={setActiveFilter}
+              />
+            ),
+          )}
         </div>
 
-        {/* Chat Items */}
         <div className="chat-items">
-          {ChatsToShow.map((chat) => (
+          {chatsLoading && <p className="chat-empty-state">Loading chats...</p>}
+          {chatsError && (
+            <p className="chat-empty-state">Unable to load chats.</p>
+          )}
+          {!chatsLoading && !filteredChats.length && (
+            <p className="chat-empty-state">No chats found.</p>
+          )}
+          {filteredChats.map((chat) => (
             <UserButton
               key={chat.id}
               chat={chat}
-              activeChat={activeChat}
-              setActiveChat={setActiveChat}
+              activeChat={selectedChat}
+              onSelect={setActiveChat}
             />
           ))}
         </div>
       </section>
 
-      {/* =====================================================
-    MAIN CHAT AREA
-====================================================== */}
-
       <main className="conversation-panel">
-        {/* Telegram-style Header Bubble */}
-        <header className="conversation-header">
-          {isChatRoute && (
-            <button
-              className="mobile-back-button"
-              title="Back to chats"
-              aria-label="Back to chats"
-              onClick={() => {
-                setShowDetails(false);
-                navigate("/");
-              }}
-            >
-              <ArrowLeft size={23} />
-            </button>
-          )}
+        {selectedChat ? (
+          <>
+            <header className="conversation-header">
+              {isChatRoute && (
+                <button
+                  className="mobile-back-button"
+                  title="Back to chats"
+                  onClick={() => navigate("/")}
+                >
+                  <ArrowLeft size={23} />
+                </button>
+              )}
 
-          <div className="conversation-user">
-            <div className="conversation-avatar-wrapper">
-              <img src={activeChat.avatar} alt={activeChat.name} />
-            </div>
-
-            <div className="conversation-user-info">
-              <h2>{activeChat.name}</h2>
-
-              <span>
-                {activeChat.online ? (
-                  <div>
-                    <i />
-                    Online
-                  </div>
-                ) : (
-                  <div>Offline</div>
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div className="conversation-actions">
-            <button title="Audio call" aria-label="Audio call">
-              <Phone size={23} />
-            </button>
-
-            <button title="Video call" aria-label="Video call">
-              <Video size={23} />
-            </button>
-
-            <button
-              title={showDetails ? "Hide information" : "Show information"}
-              aria-label={showDetails ? "Hide information" : "Show information"}
-              className={
-                showDetails ? "details-toggle active" : "details-toggle"
-              }
-              onClick={() => setShowDetails((value) => !value)}
-            >
-              <MoreVertical size={24} />
-            </button>
-          </div>
-        </header>
-
-        {/* Messages */}
-        <div className="messages-container">
-          <div className="date-divider">
-            <span>
-              {new Date().toLocaleDateString("en-US", { weekday: "long" })}
-            </span>
-          </div>
-          {messages.map((message) =>
-            message.type === "recieved" ? (
-              <RecievedMessage
-                key={message.id}
-                toggleMessageActions={toggleMessageActions}
-                activeMessageId={activeMessageId}
-                message={message.message}
-                time={message.time}
-                id={message.id}
-                setReply={setReply}
-                reply={message.reply}
-              />
-            ) : (
-              <SentMessage
-                key={message.id}
-                toggleMessageActions={toggleMessageActions}
-                activeMessageId={activeMessageId}
-                message={message.message}
-                time={message.time}
-                id={message.id}
-                seen={message.seen}
-                setReply={setReply}
-                reply={message.reply}
-              />
-            ),
-          )}
-          <div
-            ref={messagesEndRef}
-            className="messages-end"
-            aria-hidden="true"
-          />
-        </div>
-
-        {/* Message Composer */}
-        <div className={`message-composer ${reply ? "replying" : ""}`}>
-          {reply && (
-            <div className="reply-preview">
-              <div className="reply-preview-content">
-                <Reply size={17} />
-                <div>
-                  <span>Replying to message</span>
-                  <p>{reply}</p>
+              <div className="conversation-user">
+                <div className="conversation-avatar-wrapper">
+                  <img
+                    src={selectedChat.friend.avatar}
+                    alt={selectedChat.friend.name}
+                  />
+                </div>
+                <div className="conversation-user-info">
+                  <h2>{selectedChat.friend.name}</h2>
+                  <span>
+                    {selectedChat.friend.online ? (
+                      <div>
+                        <i />
+                        Online
+                      </div>
+                    ) : (
+                      <div>Offline</div>
+                    )}
+                  </span>
                 </div>
               </div>
 
-              <button
-                className="reply-cancel-button"
-                title="Cancel reply"
-                aria-label="Cancel reply"
-                onClick={() => setReply(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-          )}
+              <div className="conversation-actions">
+                <button title="Audio call">
+                  <Phone size={23} />
+                </button>
+                <button title="Video call">
+                  <Video size={23} />
+                </button>
+                <button
+                  className={
+                    showDetails ? "details-toggle active" : "details-toggle"
+                  }
+                  onClick={() => setShowDetails((value) => !value)}
+                  title="More"
+                >
+                  <MoreVertical size={24} />
+                </button>
+              </div>
+            </header>
 
-          <div className="composer-input-row">
-            <button className="composer-button" title="Attach file">
-              <Paperclip size={24} />
-            </button>
-
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              rows={1}
-            />
-
-            <div className="composer-actions">
-              <button title="Voice message">
-                <Mic size={24} />
-              </button>
-            </div>
-
-            {message.trim() && (
-              <button
-                className="send-button"
-                onClick={sendMessage}
-                title="Send message"
-              >
-                <Send size={19} />
-              </button>
+            {showChatSearch && (
+              <div className="chat-message-search">
+                <Search size={18} />
+                <input
+                  autoFocus
+                  value={chatSearch}
+                  onChange={(event) => setChatSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") runMessageSearch();
+                    if (event.key === "Escape") closeChatSearch();
+                  }}
+                  placeholder="Search messages..."
+                />
+                <span className="search-result-count">
+                  {searchMatches.length
+                    ? `${searchMatchIndex + 1}/${searchMatches.length}`
+                    : "0/0"}
+                </span>
+                <button onClick={runMessageSearch} title="Search">
+                  <Search size={17} />
+                </button>
+                <button
+                  onClick={() => moveSearchMatch("previous")}
+                  title="Previous"
+                >
+                  <ChevronUp size={18} />
+                </button>
+                <button onClick={() => moveSearchMatch("next")} title="Next">
+                  <ChevronDown size={18} />
+                </button>
+                <button onClick={closeChatSearch} title="Cancel">
+                  <X size={18} />
+                </button>
+              </div>
             )}
-          </div>
-        </div>
-      </main>
 
-      {/* =====================================================
-    RIGHT PROFILE PANEL
-====================================================== */}
+            <div
+              className="messages-container"
+              onScroll={(event) => {
+                const element = event.currentTarget;
+                setShowScrollToBottom(
+                  element.scrollHeight -
+                    element.scrollTop -
+                    element.clientHeight >
+                    120,
+                );
+              }}
+            >
+              <div className="date-divider">
+                <span>Today</span>
+              </div>
+              {messages
+                .filter((item) => !item.deleted)
+                .map((item) => (
+                  <MessageBubble
+                    key={item.id}
+                    message={item}
+                    isMine={item.senderId === currentUser?.id}
+                    active={activeMessageId === item.id}
+                    onToggleActions={(id) =>
+                      setActiveMessageId((current) =>
+                        current === id ? null : id,
+                      )
+                    }
+                    onReply={(value) => {
+                      setReply(value);
+                      setActiveMessageId(null);
+                    }}
+                    onReact={async (id, emoji) => {
+                      await reactMessage({
+                        variables: { messageId: id, emoji },
+                        refetchQueries: [
+                          {
+                            query: MESSAGES_QUERY,
+                            variables: { chatId: selectedChat.id },
+                          },
+                        ],
+                      });
+                      setActiveMessageId(null);
+                    }}
+                    onDelete={async (id) => {
+                      await deleteMessage({
+                        variables: { messageId: id },
+                        refetchQueries: [
+                          {
+                            query: MESSAGES_QUERY,
+                            variables: { chatId: selectedChat.id },
+                          },
+                        ],
+                      });
+                      setActiveMessageId(null);
+                    }}
+                  />
+                ))}
+
+              <div ref={messagesEndRef} />
+
+              {showScrollToBottom && (
+                <button
+                  className="scroll-to-bottom-button"
+                  onClick={scrollToBottom}
+                  title="Scroll to newest message"
+                >
+                  <ChevronDown size={21} />
+                </button>
+              )}
+            </div>
+
+            <div className={`message-composer ${reply ? "replying" : ""}`}>
+              {reply && (
+                <div className="reply-preview">
+                  <div className="reply-preview-content">
+                    <span>Replying to</span>
+                    <p>{reply.content || "Attachment"}</p>
+                  </div>
+                  <button
+                    className="reply-cancel-button"
+                    onClick={() => setReply(null)}
+                    title="Cancel reply"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              )}
+
+              <div className="composer-input-row">
+                <button
+                  className="composer-button"
+                  title="Attach image or video"
+                  disabled={isBlocked(selectedChat) || recording}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip size={24} />
+                </button>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  hidden
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void sendAttachment(file);
+                    event.target.value = "";
+                  }}
+                />
+
+                <textarea
+                  value={
+                    recording
+                      ? `Recording ${Math.floor(recordingSeconds / 60)
+                          .toString()
+                          .padStart(
+                            2,
+                            "0",
+                          )}:${(recordingSeconds % 60).toString().padStart(2, "0")}`
+                      : message
+                  }
+                  onChange={(event) =>
+                    !recording && setMessage(event.target.value)
+                  }
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    isBlocked(selectedChat)
+                      ? "You cannot message this user"
+                      : "Type a message..."
+                  }
+                  rows={1}
+                  readOnly={recording || isBlocked(selectedChat)}
+                />
+
+                <div className="composer-actions">
+                  <button
+                    title={recording ? "Stop recording" : "Voice message"}
+                    onClick={
+                      recording ? stopRecording : () => void startRecording()
+                    }
+                    disabled={isBlocked(selectedChat)}
+                  >
+                    {recording ? (
+                      <span className="recording-dot" />
+                    ) : (
+                      <Mic size={24} />
+                    )}
+                  </button>
+                </div>
+
+                {!recording && message.trim() && (
+                  <button
+                    className="send-button"
+                    onClick={() => void sendTextMessage()}
+                    title="Send"
+                  >
+                    <Send size={19} />
+                  </button>
+                )}
+              </div>
+
+              {isBlocked(selectedChat) && (
+                <div className="blocked-chat-notice">
+                  This user has blocked you. Sending messages and media is
+                  disabled.
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="empty-conversation">
+            <h2>Select a chat</h2>
+            <p>Choose a friend from your chats to start messaging.</p>
+          </div>
+        )}
+      </main>
 
       {showDetails && (
         <div
           className="details-backdrop"
-          aria-hidden="true"
           onClick={() => setShowDetails(false)}
         />
       )}
@@ -493,108 +777,290 @@ const Chats = () => {
         className="details-panel"
         onClick={(event) => event.stopPropagation()}
       >
-        {/* Profile Bubble */}
-        <section className="details-bubble profile-bubble">
-          <div className="large-profile-avatar-wrapper">
-            <img src={activeChat.avatar} alt={activeChat.name} />
-          </div>
-
-          <h2>{activeChat.name}</h2>
-
-          <span className="username">@alex.johnson</span>
-
-          <span className="profile-online">
-            <i />
-            Online
-          </span>
-        </section>
-
-        {/* About Bubble */}
-        <section className="details-bubble about-bubble">
-          <h3>About</h3>
-
-          <p>Information aboout the User</p>
-        </section>
-
-        {/* Media Bubble */}
-        <section className="details-bubble media-bubble">
-          <div className="bubble-title-row">
-            <h3>Pictures & Images</h3>
-
-            <button>See all</button>
-          </div>
-
-          <div className="media-grid">
-            <div className="media-item image-preview">
-              <img
-                src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=300"
-                alt="Shared media"
-              />
-            </div>
-
-            <div className="media-item purple-preview">
-              <div className="fake-project">
-                <div />
-                <div />
-                <div />
+        {selectedChat && (
+          <>
+            <section className="details-bubble profile-bubble">
+              <div className="large-profile-avatar-wrapper">
+                <img
+                  src={selectedChat.friend.avatar}
+                  alt={selectedChat.friend.name}
+                />
               </div>
-            </div>
+              <h2>{selectedChat.friend.name}</h2>
+              <span className="username">{selectedChat.friend.username}</span>
+              <span className="profile-online">
+                {selectedChat.friend.online ? (
+                  <>
+                    <i />
+                    Online
+                  </>
+                ) : (
+                  "Offline"
+                )}
+              </span>
+            </section>
 
-            <div className="media-item project-preview">
-              <span>Project.</span>
+            <section className="details-bubble action-bubble">
+              <button className="profile-action">
+                <Phone size={25} />
+                <span>Audio Call</span>
+              </button>
 
-              <div className="project-lines">
-                <i />
-                <i />
-                <i />
+              <button className="profile-action">
+                <Video size={25} />
+                <span>Video Call</span>
+              </button>
+
+              <button
+                className="profile-action"
+                onClick={() => {
+                  setShowChatSearch(true);
+                  if (window.matchMedia("(max-width: 1100px)").matches)
+                    setShowDetails(false);
+                }}
+              >
+                <SearchIcon size={25} />
+                <span>Search</span>
+              </button>
+
+              <button
+                className="profile-action"
+                onClick={() => {
+                  setShowGemini(true);
+                  setShowDetails(false);
+                }}
+              >
+                <img className="gemini" src={GeminiIcon} alt="Gemini" />
+                <span>Gemini</span>
+              </button>
+            </section>
+
+            <section className="details-bubble about-bubble">
+              <h3>About</h3>
+              <p>{selectedChat.friend.bio || "No information available."}</p>
+            </section>
+
+            <section className="details-bubble media-bubble">
+              <div className="bubble-title-row">
+                <h3>Pictures & Videos</h3>
+                <button
+                  onClick={() => {
+                    setShowMediaOverlay(true);
+                    setShowDetails(false);
+                  }}
+                >
+                  See all
+                </button>
               </div>
-            </div>
 
-            <div className="media-item folder-preview">
-              <Folder size={35} />
-            </div>
-          </div>
-        </section>
+              <div className="media-grid">
+                {media.slice(0, 4).map((item) => (
+                  <div className="media-item image-preview" key={item.id}>
+                    {item.type === "video" ? (
+                      <video src={item.url} muted />
+                    ) : (
+                      <img src={item.url} alt={item.name ?? "Shared media"} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
 
-        {/* Settings Bubble */}
-        <section className="details-bubble settings-bubble">
-          <h3>Settings</h3>
+            <section className="details-bubble settings-bubble">
+              <h3>Settings</h3>
+              <div className="setting-row">
+                <div className="setting-left">
+                  <Bell size={22} />
+                  <span>Mute notifications</span>
+                </div>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={selectedChat.muted}
+                    onChange={() => void toggleChatSetting("muted")}
+                  />
+                  <span className="slider" />
+                </label>
+              </div>
 
-          <div className="setting-row">
-            <div className="setting-left">
-              <Bell size={22} />
+              <div className="setting-row">
+                <div className="setting-left">
+                  <Pin size={22} />
+                  <span>Pin chat</span>
+                </div>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={selectedChat.pinned}
+                    onChange={() => void toggleChatSetting("pinned")}
+                  />
+                  <span className="slider" />
+                </label>
+              </div>
 
-              <span>Mute notifications</span>
-            </div>
-
-            <label className="switch">
-              <input type="checkbox" />
-
-              <span className="slider" />
-            </label>
-          </div>
-
-          <div className="setting-row">
-            <div className="setting-left">
-              <Pin size={22} />
-
-              <span>Pin chat</span>
-            </div>
-
-            <label className="switch">
-              <input type="checkbox" defaultChecked />
-
-              <span className="slider" />
-            </label>
-          </div>
-
-          <button className="block-button">
-            <Ban size={22} />
-
-            <span>Remove Friend</span>
-          </button>
-        </section>
+              <button
+                className="block-button"
+                onClick={async () => {
+                  await blockUser({
+                    variables: { userId: selectedChat.friend.id },
+                  });
+                  setShowDetails(false);
+                }}
+              >
+                <Ban size={22} />
+                <span>Block Friend</span>
+              </button>
+            </section>
+          </>
+        )}
       </aside>
+
+      {showMediaOverlay && (
+        <div
+          className="media-overlay"
+          onClick={() => {
+            setShowMediaOverlay(false);
+            setSelectedMedia(null);
+          }}
+        >
+          <section
+            className="media-overlay-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="media-overlay-header">
+              <div>
+                <h2>{selectedMedia ? "Media" : "Pictures & Videos"}</h2>
+                <span>
+                  {selectedMedia
+                    ? "Shared in this conversation"
+                    : `${media.length} shared items`}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  if (selectedMedia) setSelectedMedia(null);
+                  else setShowMediaOverlay(false);
+                }}
+                title={selectedMedia ? "Back" : "Close"}
+              >
+                {selectedMedia ? <ArrowLeft size={22} /> : <X size={22} />}
+              </button>
+            </header>
+
+            {selectedMedia ? (
+              <div className="media-single-view">
+                {selectedMedia.type === "video" ? (
+                  <video src={selectedMedia.url} controls autoPlay />
+                ) : (
+                  <img
+                    src={selectedMedia.url}
+                    alt={selectedMedia.name ?? "Shared media"}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="media-overlay-grid">
+                {media.length ? (
+                  media.map((item) => (
+                    <button
+                      key={item.id}
+                      className="media-overlay-item"
+                      onClick={() => setSelectedMedia(item)}
+                    >
+                      {item.type === "video" ? (
+                        <video src={item.url} muted />
+                      ) : (
+                        <img src={item.url} alt={item.name ?? "Shared media"} />
+                      )}
+                      {item.type === "video" && <span>Video</span>}
+                    </button>
+                  ))
+                ) : (
+                  <p>No pictures or videos have been shared yet.</p>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {showGemini && (
+        <div className="gemini-overlay" onClick={() => setShowGemini(false)}>
+          <section
+            className="gemini-chat-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="gemini-chat-header">
+              <div className="gemini-modal-title">
+                <div className="gemini-icon">
+                  <img className="gemini" src={GeminiIcon} alt="Gemini" />
+                </div>
+                <div className="gemini-modal-title-text">
+                  <h2>Gemini</h2>
+                  <span>Chat about this conversation</span>
+                </div>
+              </div>
+              <button onClick={() => setShowGemini(false)} title="Close Gemini">
+                <X size={21} />
+              </button>
+            </header>
+
+            <div className="gemini-chat-body">
+              {!geminiMessages.length && (
+                <div className="gemini-welcome">
+                  <div className="gemini-large-icon">
+                    <img className="gemini" src={GeminiIcon} alt="Gemini" />
+                  </div>
+                  <h3>Ask Gemini about this chat</h3>
+                  <p>
+                    Discuss messages or ask questions about this conversation.
+                  </p>
+                </div>
+              )}
+
+              {geminiMessages.map((item) => (
+                <div
+                  key={item.id}
+                  className={`gemini-inline-message ${item.sender === "user" ? "sent" : "received"}`}
+                >
+                  <p>{item.content}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="gemini-modal-footer">
+              {isGeminiSending && (
+                <div className="sending-indicator">
+                  <span className="sending-dot" />
+                  <span>Sending message...</span>
+                </div>
+              )}
+
+              <div className="gemini-composer">
+                <input
+                  value={geminiInput}
+                  onChange={(event) => setGeminiInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void sendGeminiMessage();
+                    }
+                  }}
+                  placeholder="Ask Gemini about this conversation..."
+                  disabled={isGeminiSending}
+                />
+                <button
+                  onClick={() => void sendGeminiMessage()}
+                  disabled={!geminiInput.trim() || isGeminiSending}
+                  title="Send"
+                >
+                  <Send size={19} />
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

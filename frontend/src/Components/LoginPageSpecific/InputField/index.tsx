@@ -22,7 +22,12 @@ const InputField = ({
       <label>{label}</label>
       <div className="input-wrapper">
         {icon}
-        <InputBox type={type} value={value} setValue={setValue} />
+        <InputBox
+          type={type}
+          value={value}
+          setValue={setValue}
+          placeholder={label}
+        />
         {children}
       </div>
     </div>

@@ -1,28 +1,7 @@
-import type { RequestUser } from "../../../types";
+import type { User } from "../../../types";
 import DiscoverButtons from "./DiscoverButtons";
 import UserPictureName from "./UserPictuteName";
-
-interface DiscoverIndexProps {
-  user: RequestUser;
-  handleAddFriend: (user: RequestUser) => void;
-}
-
-const DiscoverIndex = ({ user, handleAddFriend }: DiscoverIndexProps) => {
-  return (
-    <article className="user-card">
-      {/* User information at top */}
-      <UserPictureName user={user} />
-
-      {/* About */}
-      <p className="user-bio">{user.bio}</p>
-
-      {/* Divider */}
-      <div className="card-divider" />
-
-      {/* Bottom row */}
-      <DiscoverButtons user={user} handleAddFriend={handleAddFriend} />
-    </article>
-  );
-};
-
+type DiscoverUser = User & { mutualFriends: number; request?: "sent" | "received" };
+interface DiscoverIndexProps { user: DiscoverUser; handleAddFriend: (user: DiscoverUser) => void; }
+const DiscoverIndex = ({ user, handleAddFriend }: DiscoverIndexProps) => <article className="user-card"><UserPictureName user={user} /><p className="user-bio">{user.bio}</p><div className="card-divider" /><DiscoverButtons user={user} handleAddFriend={handleAddFriend} /></article>;
 export default DiscoverIndex;

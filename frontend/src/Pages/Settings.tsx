@@ -1,9 +1,25 @@
-import { useState } from "react";
-import { useTheme, useThemeAction } from "../store";
+import { useEffect, useRef, useState } from "react";
+
+import { useMutation, useQuery } from "@apollo/client/react";
+import { useNavigate } from "react-router-dom";
+
+import PrivacyRow from "../Components/SettingsSpecific/PrivacyRow";
+
+import {
+  BLOCKED_USERS_QUERY,
+  CHANGE_EMAIL_MUTATION,
+  CHANGE_PASSWORD_MUTATION,
+  DELETE_ACCOUNT_MUTATION,
+  ME_QUERY,
+  PREPARE_PROFILE_UPLOAD_MUTATION,
+  UNBLOCK_USER_MUTATION,
+  UPDATE_PRIVACY_MUTATION,
+  UPDATE_PROFILE_MUTATION,
+} from "../services/graphql";
+
 import {
   UserRound,
   Palette,
-  Bell,
   Shield,
   Ban,
   UserCog,
@@ -21,153 +37,194 @@ import {
   LockKeyhole,
 } from "lucide-react";
 
+import {
+  useAppStore,
+  useCurrentUser,
+  useTheme,
+  useAccentColor,
+} from "../store";
+
+import type {
+  AccentColor,
+  BlockedUser,
+  CurrentUser,
+  ProfileUpdateInput,
+  Theme,
+} from "../types";
+
 type SettingsSection =
   | "profile"
   | "appearance"
-  | "notifications"
   | "privacy"
   | "blocked"
   | "account"
   | "help";
 
-interface MenuItems {
-  id: SettingsSection;
-  label: string;
-  icon: React.ReactNode;
-}
-
-type BlockedUser = {
-  id: number;
-  name: string;
-  username: string;
-  avatar: string;
+type PrepareProfileUploadData = {
+  prepareProfileUpload: {
+    uploadUrl?: string;
+    publicUrl: string;
+  };
 };
 
-type Colors = "blue" | "pruple" | "pink" | "green" | "orange" | "cyan";
+type ChangeEmailData = {
+  changeEmail: CurrentUser;
+};
 
-const blockedUsers: BlockedUser[] = [
-  {
-    id: 1,
-    name: "Michael Brown",
-    username: "@michael.brown",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=MichaelBrown",
-  },
-  {
-    id: 2,
-    name: "Sophia Martinez",
-    username: "@sophia.martinez",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=SophiaMartinez",
-  },
-  {
-    id: 3,
-    name: "Daniel Lee",
-    username: "@daniel.lee",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=DanielLee",
-  },
+const accentColors: AccentColor[] = [
+  "blue",
+  "purple",
+  "pink",
+  "green",
+  "orange",
+  "cyan",
 ];
 
 const Settings = () => {
+  const navigate = useNavigate();
+  const currentUser = useCurrentUser();
+
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("profile");
+  const [name, setName] = useState(currentUser?.name ?? "");
+  const [username, setUsername] = useState(currentUser?.username ?? "");
+  const [bio, setBio] = useState(currentUser?.bio ?? "");
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newEmail, setNewEmail] = useState(currentUser?.email ?? "");
+  const [showDelete, setShowDelete] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
 
-  const [name, setName] = useState("John Doe");
-  const [username, setUsername] = useState("@johndoe");
-  const [email, setEmail] = useState("john.doe@example.com");
-  const [about, setAbout] = useState(
-    "Product designer passionate about creating meaningful experiences and building cool things.",
-  );
-  const [color, setColor] = useState<Colors>("blue");
+  const accentColor = useAccentColor();
 
   const theme = useTheme();
-  const { setTheme } = useThemeAction();
 
-  const [notifications, setNotifications] = useState(true);
+  const {
+    setTheme,
+    setAccentColor,
+    setCurrentUser,
+    updateCurrentUser,
+    setOnlineStatusVisible,
+    setAllowFriendRequests,
+    reset,
+  } = useAppStore();
 
-  const [blocked, setBlocked] = useState<BlockedUser[]>(blockedUsers);
+  const profileInputRef = useRef<HTMLInputElement>(null);
 
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const { data: meData } = useQuery<{ me: CurrentUser }>(ME_QUERY, {
+    skip: Boolean(currentUser),
+  });
 
-  const menuItems: MenuItems[] = [
-    {
-      id: "profile",
-      label: "Profile",
-      icon: <UserRound size={20} />,
-    },
-    {
-      id: "appearance",
-      label: "Appearance",
-      icon: <Palette size={20} />,
-    },
-    {
-      id: "notifications",
-      label: "Notifications",
-      icon: <Bell size={20} />,
-    },
-    {
-      id: "privacy",
-      label: "Privacy & Security",
-      icon: <Shield size={20} />,
-    },
-    {
-      id: "blocked",
-      label: "Blocked Users",
-      icon: <Ban size={20} />,
-    },
-    {
-      id: "account",
-      label: "Account",
-      icon: <UserCog size={20} />,
-    },
-    {
-      id: "help",
-      label: "Help & Support",
-      icon: <CircleHelp size={20} />,
-    },
-  ];
+  const { data: blockedData, refetch: refetchBlocked } = useQuery<{
+    blockedUsers: BlockedUser[];
+  }>(BLOCKED_USERS_QUERY, { skip: activeSection !== "blocked" });
 
-  const unblockUser = (id: number) => {
-    setBlocked((users) => users.filter((user) => user.id !== id));
+  const [updateProfile] = useMutation<{ updateProfile: CurrentUser }>(
+    UPDATE_PROFILE_MUTATION,
+  );
+
+  const [updatePrivacy] = useMutation(UPDATE_PRIVACY_MUTATION);
+  const [unblock] = useMutation(UNBLOCK_USER_MUTATION);
+  const [changePassword] = useMutation(CHANGE_PASSWORD_MUTATION);
+  const [changeEmail] = useMutation<ChangeEmailData>(CHANGE_EMAIL_MUTATION);
+  const [deleteAccount] = useMutation(DELETE_ACCOUNT_MUTATION);
+  const [prepareProfileUpload] = useMutation<PrepareProfileUploadData>(
+    PREPARE_PROFILE_UPLOAD_MUTATION,
+  );
+
+  useEffect(() => {
+    if (meData?.me) setCurrentUser(meData.me);
+  }, [meData, setCurrentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setName(currentUser.name);
+    setUsername(currentUser.username);
+    setBio(currentUser.bio);
+    setNewEmail(currentUser.email ?? "");
+  }, [currentUser]);
+
+  const saveProfile = async () => {
+    const input: ProfileUpdateInput = {
+      name: name.trim(),
+      username: username.trim(),
+      bio: bio.trim(),
+    };
+
+    const result = await updateProfile({ variables: { input } });
+
+    if (result.data?.updateProfile)
+      updateCurrentUser(result.data.updateProfile);
+
+    setStatusMessage("Profile updated successfully.");
   };
 
-  const saveProfile = () => {
-    console.log({
-      name,
-      username,
-      email,
-      about,
+  const changeProfilePicture = async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+
+    const { data } = await prepareProfileUpload({
+      variables: { fileName: file.name, mimeType: file.type, size: file.size },
     });
+
+    if (!data?.prepareProfileUpload) return;
+
+    if (data.prepareProfileUpload.uploadUrl) {
+      const response = await fetch(data.prepareProfileUpload.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+
+      if (!response.ok) throw new Error("Profile picture upload failed.");
+    }
+
+    const result = await updateProfile({
+      variables: { input: { avatar: data.prepareProfileUpload.publicUrl } },
+    });
+
+    if (result.data?.updateProfile)
+      updateCurrentUser(result.data.updateProfile);
+  };
+
+  const setPrivacy = async (
+    onlineStatusVisible: boolean,
+    allowFriendRequests: boolean,
+  ) => {
+    await updatePrivacy({
+      variables: { onlineStatusVisible, allowFriendRequests },
+    });
+    setOnlineStatusVisible(onlineStatusVisible);
+    setAllowFriendRequests(allowFriendRequests);
+  };
+
+  const menuItems = [
+    { id: "profile", label: "Profile", icon: <UserRound size={20} /> },
+    { id: "appearance", label: "Appearance", icon: <Palette size={20} /> },
+    { id: "privacy", label: "Privacy & Security", icon: <Shield size={20} /> },
+    { id: "blocked", label: "Blocked Users", icon: <Ban size={20} /> },
+    { id: "account", label: "Account", icon: <UserCog size={20} /> },
+    { id: "help", label: "Help & Support", icon: <CircleHelp size={20} /> },
+  ] as const;
+
+  const handleDeleteAccount = async () => {
+    await deleteAccount();
+    reset();
+    navigate("/");
   };
 
   return (
-    <div
-      className={`settings-page ${
-        theme === "light" ? "settings-light-mode" : ""
-      }`}
-    >
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
-
+    <div className="settings-page">
       <header className="settings-page-header">
         <div>
           <h1>Settings</h1>
-
           <p>Manage your account, preferences and security</p>
         </div>
       </header>
 
-      {/* =====================================================
-          SETTINGS LAYOUT
-      ====================================================== */}
-
       <div className="settings-layout">
-        {/* ===================================================
-            SETTINGS MENU
-        ==================================================== */}
-
         <aside className="settings-menu">
           <div className="settings-menu-title">SETTINGS</div>
-
           <div className="settings-menu-items">
             {menuItems.map((item) => (
               <button
@@ -180,32 +237,27 @@ const Settings = () => {
                 onClick={() => setActiveSection(item.id)}
               >
                 {item.icon}
-
                 <span>{item.label}</span>
               </button>
             ))}
           </div>
 
-          {/* Logout */}
-
           <button
             className="logout-button"
-            onClick={() => console.log("Logout")}
+            onClick={() => {
+              reset();
+              navigate("/");
+            }}
           >
             <LogOut size={20} />
-
             <span>Log Out</span>
           </button>
         </aside>
 
-        {/* ===================================================
-            SETTINGS CONTENT
-        ==================================================== */}
-
         <main className="settings-content">
-          {/* =================================================
-              PROFILE
-          ================================================== */}
+          {statusMessage && (
+            <div className="settings-status-message">{statusMessage}</div>
+          )}
 
           {activeSection === "profile" && (
             <section className="settings-section">
@@ -213,45 +265,51 @@ const Settings = () => {
                 <div className="settings-card-header">
                   <div>
                     <h2>Profile Information</h2>
-
                     <p>Update your personal information</p>
                   </div>
                 </div>
-
                 <div className="profile-edit-area">
-                  {/* Avatar */}
-
                   <div className="settings-profile-picture">
                     <div className="settings-avatar-wrapper">
                       <img
-                        src="https://api.dicebear.com/9.x/adventurer/svg?seed=User"
-                        alt="Your profile"
+                        src={currentUser?.avatar}
+                        alt={currentUser?.name ?? "Your profile"}
                       />
-
                       <button
                         className="change-picture-button"
+                        onClick={() => profileInputRef.current?.click()}
                         title="Change profile picture"
                       >
                         <Camera size={17} />
                       </button>
+
+                      <input
+                        ref={profileInputRef}
+                        hidden
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) void changeProfilePicture(file);
+                          event.target.value = "";
+                        }}
+                      />
                     </div>
 
-                    <button className="change-picture-text">
+                    <button
+                      className="change-picture-text"
+                      onClick={() => profileInputRef.current?.click()}
+                    >
                       Change profile picture
                     </button>
                   </div>
 
-                  {/* Fields */}
-
                   <div className="profile-fields">
                     <div className="settings-input-group">
                       <label>Full Name</label>
-
                       <div className="settings-input-wrapper">
                         <UserRound size={18} />
-
                         <input
-                          type="text"
                           value={name}
                           onChange={(event) => setName(event.target.value)}
                         />
@@ -260,38 +318,20 @@ const Settings = () => {
 
                     <div className="settings-input-group">
                       <label>Username</label>
-
                       <div className="settings-input-wrapper">
                         <AtSign size={18} />
-
                         <input
-                          type="text"
                           value={username}
                           onChange={(event) => setUsername(event.target.value)}
                         />
                       </div>
                     </div>
 
-                    <div className="settings-input-group">
-                      <label>Email</label>
-
-                      <div className="settings-input-wrapper">
-                        <Mail size={18} />
-
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(event) => setEmail(event.target.value)}
-                        />
-                      </div>
-                    </div>
-
                     <div className="settings-input-group full-width">
                       <label>About You</label>
-
                       <textarea
-                        value={about}
-                        onChange={(event) => setAbout(event.target.value)}
+                        value={bio}
+                        onChange={(event) => setBio(event.target.value)}
                         rows={4}
                         style={{ resize: "none" }}
                       />
@@ -302,39 +342,14 @@ const Settings = () => {
                 <div className="settings-card-footer">
                   <button
                     className="primary-settings-button"
-                    onClick={saveProfile}
+                    onClick={() => void saveProfile()}
                   >
                     Save Changes
                   </button>
                 </div>
               </div>
-
-              {/* Password */}
-
-              <div className="settings-card">
-                <div className="settings-card-header">
-                  <div>
-                    <h2>Password</h2>
-
-                    <p>Keep your account secure with a strong password.</p>
-                  </div>
-
-                  <LockKeyhole size={22} />
-                </div>
-
-                <button
-                  className="secondary-settings-button"
-                  onClick={() => console.log("Change password")}
-                >
-                  Change Password
-                </button>
-              </div>
             </section>
           )}
-
-          {/* =================================================
-              APPEARANCE
-          ================================================== */}
 
           {activeSection === "appearance" && (
             <section className="settings-section">
@@ -342,139 +357,61 @@ const Settings = () => {
                 <div className="settings-card-header">
                   <div>
                     <h2>Appearance</h2>
-
                     <p>Customize how ChatFlow looks.</p>
                   </div>
                 </div>
 
                 <div className="appearance-group">
                   <h3>Theme</h3>
-
                   <p className="appearance-description">
                     Choose your preferred theme for the application.
                   </p>
-
                   <div className="theme-options">
-                    <button
-                      className={
-                        theme === "dark"
-                          ? "theme-option active"
-                          : "theme-option"
-                      }
-                      onClick={() => setTheme("dark")}
-                    >
-                      <Moon size={22} />
+                    {(["dark", "light"] as Theme[]).map((value) => (
+                      <button
+                        key={value}
+                        className={
+                          theme === value
+                            ? "theme-option active"
+                            : "theme-option"
+                        }
+                        onClick={() => setTheme(value)}
+                      >
+                        {value === "dark" ? (
+                          <Moon size={22} />
+                        ) : (
+                          <Sun size={22} />
+                        )}
 
-                      <span>Dark</span>
-
-                      {theme === "dark" && <Check size={17} />}
-                    </button>
-
-                    <button
-                      className={
-                        theme === "light"
-                          ? "theme-option active"
-                          : "theme-option"
-                      }
-                      onClick={() => setTheme("light")}
-                    >
-                      <Sun size={22} />
-
-                      <span>Light</span>
-
-                      {theme === "light" && <Check size={17} />}
-                    </button>
+                        <span>{value[0].toUpperCase() + value.slice(1)}</span>
+                        {theme === value && <Check size={17} />}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div className="appearance-group">
                   <h3>Accent Color</h3>
-
                   <p className="appearance-description">
                     Choose your favorite accent color.
                   </p>
-
                   <div className="accent-colors">
-                    <button className="accent-color active" aria-label="Blue">
-                      <span />
-                      <Check size={15} />
-                    </button>
-
-                    <button className="accent-color purple" aria-label="Purple">
-                      <span />
-                    </button>
-
-                    <button className="accent-color pink" aria-label="Pink">
-                      <span />
-                    </button>
-
-                    <button className="accent-color green" aria-label="Green">
-                      <span />
-                    </button>
-
-                    <button className="accent-color orange" aria-label="Orange">
-                      <span />
-                    </button>
-
-                    <button className="accent-color cyan" aria-label="Cyan">
-                      <span />
-                    </button>
+                    {accentColors.map((value) => (
+                      <button
+                        key={value}
+                        className={`accent-color ${value} ${accentColor === value ? "active" : ""}`}
+                        aria-label={value}
+                        onClick={() => setAccentColor(value)}
+                      >
+                        <span />
+                        {accentColor === value && <Check size={15} />}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
             </section>
           )}
-
-          {/* =================================================
-              NOTIFICATIONS
-          ================================================== */}
-
-          {activeSection === "notifications" && (
-            <section className="settings-section">
-              <div className="settings-card">
-                <div className="settings-card-header">
-                  <div>
-                    <h2>Notifications</h2>
-
-                    <p>Choose how you want to be notified.</p>
-                  </div>
-                </div>
-
-                <SettingToggle
-                  icon={<Bell size={21} />}
-                  title="Message Notifications"
-                  description="Receive notifications when someone sends you a message."
-                  checked={notifications}
-                  onChange={() => setNotifications(!notifications)}
-                />
-
-                <SettingToggle
-                  icon={<UserRound size={21} />}
-                  title="Friend Requests"
-                  description="Get notified when someone sends you a friend request."
-                  checked={true}
-                />
-
-                <SettingToggle
-                  icon={<Bell size={21} />}
-                  title="Group Notifications"
-                  description="Receive notifications from your groups."
-                  checked={true}
-                />
-
-                <SettingToggle
-                  icon={<Bell size={21} />}
-                  title="Notification Sounds"
-                  description="Play a sound when a new notification arrives."
-                  checked={true}
-                />
-              </div>
-            </section>
-          )}
-
-          {/* =================================================
-              PRIVACY
-          ================================================== */}
 
           {activeSection === "privacy" && (
             <section className="settings-section">
@@ -482,7 +419,6 @@ const Settings = () => {
                 <div className="settings-card-header">
                   <div>
                     <h2>Privacy & Security</h2>
-
                     <p>Control who can interact with you.</p>
                   </div>
                 </div>
@@ -490,63 +426,29 @@ const Settings = () => {
                 <PrivacyRow
                   title="Online Status"
                   description="Allow friends to see when you're online."
-                  checked={true}
-                />
-
-                <PrivacyRow
-                  title="Read Receipts"
-                  description="Let people know when you've read their messages."
-                  checked={true}
-                />
-
-                <PrivacyRow
-                  title="Typing Indicator"
-                  description="Show when you're typing a message."
-                  checked={true}
+                  checked={currentUser?.onlineStatusVisible ?? true}
+                  onChange={(checked) =>
+                    void setPrivacy(
+                      checked,
+                      currentUser?.allowFriendRequests ?? true,
+                    )
+                  }
                 />
 
                 <PrivacyRow
                   title="Friend Requests"
                   description="Allow people to send you friend requests."
-                  checked={true}
+                  checked={currentUser?.allowFriendRequests ?? true}
+                  onChange={(checked) =>
+                    void setPrivacy(
+                      currentUser?.onlineStatusVisible ?? true,
+                      checked,
+                    )
+                  }
                 />
-              </div>
-
-              <div className="settings-card">
-                <div className="settings-card-header">
-                  <div>
-                    <h2>Security</h2>
-
-                    <p>Protect your account.</p>
-                  </div>
-                </div>
-
-                <button className="settings-action-row">
-                  <div>
-                    <Shield size={21} />
-
-                    <span>Two-Factor Authentication</span>
-                  </div>
-
-                  <ChevronRight size={20} />
-                </button>
-
-                <button className="settings-action-row">
-                  <div>
-                    <LockKeyhole size={21} />
-
-                    <span>Active Sessions</span>
-                  </div>
-
-                  <ChevronRight size={20} />
-                </button>
               </div>
             </section>
           )}
-
-          {/* =================================================
-              BLOCKED USERS
-          ================================================== */}
 
           {activeSection === "blocked" && (
             <section className="settings-section">
@@ -554,41 +456,37 @@ const Settings = () => {
                 <div className="settings-card-header">
                   <div>
                     <h2>Blocked Users</h2>
-
                     <p>Manage the people you've blocked.</p>
                   </div>
-
                   <Ban size={22} />
                 </div>
 
-                {blocked.length === 0 ? (
+                {!blockedData?.blockedUsers.length ? (
                   <div className="empty-blocked">
                     <div>
                       <Ban size={30} />
                     </div>
-
                     <h3>No blocked users</h3>
-
                     <p>People you block will appear here.</p>
                   </div>
                 ) : (
                   <div className="blocked-users-list">
-                    {blocked.map((user) => (
+                    {blockedData.blockedUsers.map((user) => (
                       <div className="blocked-user" key={user.id}>
                         <img src={user.avatar} alt={user.name} />
-
                         <div className="blocked-user-info">
                           <strong>{user.name}</strong>
-
                           <span>{user.username}</span>
                         </div>
 
                         <button
                           className="unblock-button"
-                          onClick={() => unblockUser(user.id)}
+                          onClick={async () => {
+                            await unblock({ variables: { userId: user.id } });
+                            await refetchBlocked();
+                          }}
                         >
                           <Unlock size={17} />
-
                           <span>Unblock</span>
                         </button>
                       </div>
@@ -598,71 +496,111 @@ const Settings = () => {
               </div>
             </section>
           )}
-
-          {/* =================================================
-              ACCOUNT
-          ================================================== */}
-
           {activeSection === "account" && (
             <section className="settings-section">
               <div className="settings-card">
                 <div className="settings-card-header">
                   <div>
                     <h2>Account</h2>
-
                     <p>Manage your account information.</p>
                   </div>
                 </div>
 
-                <button className="settings-action-row">
-                  <div>
-                    <Mail size={21} />
-
-                    <span>Change Email Address</span>
+                <div className="account-form">
+                  <label>Email Address</label>
+                  <div className="settings-input-wrapper">
+                    <Mail size={18} />
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(event) => setNewEmail(event.target.value)}
+                    />
                   </div>
 
-                  <ChevronRight size={20} />
-                </button>
-
-                <button className="settings-action-row">
-                  <div>
-                    <LockKeyhole size={21} />
-
-                    <span>Change Password</span>
+                  <label>Password</label>
+                  <div className="settings-input-wrapper">
+                    <LockKeyhole size={18} />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                    />
                   </div>
 
-                  <ChevronRight size={20} />
-                </button>
+                  <button
+                    className="secondary-settings-button"
+                    onClick={async () => {
+                      const result = await changeEmail({
+                        variables: { email: newEmail.trim(), password },
+                      });
+                      if (result.data?.changeEmail)
+                        updateCurrentUser({
+                          email: result.data.changeEmail.email,
+                        });
+                      setPassword("");
+                      setStatusMessage("Email updated successfully.");
+                    }}
+                  >
+                    Change Email Address
+                  </button>
+
+                  <div className="account-divider" />
+
+                  <label>Current Password</label>
+                  <div className="settings-input-wrapper">
+                    <LockKeyhole size={18} />
+                    <input
+                      type="password"
+                      value={password2}
+                      onChange={(event) => setPassword2(event.target.value)}
+                    />
+                  </div>
+
+                  <label>New Password</label>
+                  <div className="settings-input-wrapper">
+                    <LockKeyhole size={18} />
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(event) => setNewPassword(event.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    className="secondary-settings-button"
+                    onClick={async () => {
+                      await changePassword({
+                        variables: { currentPassword: password2, newPassword },
+                      });
+                      setPassword2("");
+                      setNewPassword("");
+                      setStatusMessage("Password updated successfully.");
+                    }}
+                  >
+                    Change Password
+                  </button>
+                </div>
               </div>
-
-              {/* Danger Zone */}
 
               <div className="settings-card danger-card">
                 <div className="danger-header">
                   <Trash2 size={22} />
-
                   <div>
                     <h2>Danger Zone</h2>
-
                     <p>Permanently delete your account and all of your data.</p>
                   </div>
                 </div>
 
                 <button
                   className="delete-account-button"
-                  onClick={() => setShowDeleteConfirmation(true)}
+                  onClick={() => setShowDelete(true)}
                 >
                   <Trash2 size={19} />
-
                   <span>Delete Account</span>
                 </button>
               </div>
             </section>
           )}
-
-          {/* =================================================
-              HELP
-          ================================================== */}
 
           {activeSection === "help" && (
             <section className="settings-section">
@@ -670,56 +608,31 @@ const Settings = () => {
                 <div className="settings-card-header">
                   <div>
                     <h2>Help & Support</h2>
-
                     <p>Get help with ChatFlow.</p>
                   </div>
-
                   <CircleHelp size={23} />
                 </div>
-
-                <button className="settings-action-row">
-                  <div>
-                    <CircleHelp size={21} />
-
-                    <span>Help Center</span>
-                  </div>
-
-                  <ChevronRight size={20} />
-                </button>
-
-                <button className="settings-action-row">
-                  <div>
-                    <CircleHelp size={21} />
-
-                    <span>Report a Problem</span>
-                  </div>
-
-                  <ChevronRight size={20} />
-                </button>
-
-                <button className="settings-action-row">
-                  <div>
-                    <CircleHelp size={21} />
-
-                    <span>Send Feedback</span>
-                  </div>
-
-                  <ChevronRight size={20} />
-                </button>
+                {["Help Center", "Report a Problem", "Send Feedback"].map(
+                  (item) => (
+                    <button className="settings-action-row" key={item}>
+                      <div>
+                        <CircleHelp size={21} />
+                        <span>{item}</span>
+                      </div>
+                      <ChevronRight size={20} />
+                    </button>
+                  ),
+                )}
               </div>
             </section>
           )}
         </main>
       </div>
 
-      {/* =====================================================
-          DELETE CONFIRMATION
-      ====================================================== */}
-
-      {showDeleteConfirmation && (
+      {showDelete && (
         <div
           className="delete-modal-backdrop"
-          onClick={() => setShowDeleteConfirmation(false)}
+          onClick={() => setShowDelete(false)}
         >
           <div
             className="delete-modal"
@@ -728,25 +641,21 @@ const Settings = () => {
             <div className="delete-modal-icon">
               <Trash2 size={28} />
             </div>
-
             <h2>Delete your account?</h2>
-
             <p>
               This action is permanent. Your profile, messages, friends and
               other account data will be permanently deleted.
             </p>
-
             <div className="delete-modal-actions">
               <button
                 className="cancel-delete-button"
-                onClick={() => setShowDeleteConfirmation(false)}
+                onClick={() => setShowDelete(false)}
               >
                 Cancel
               </button>
-
               <button
                 className="confirm-delete-button"
-                onClick={() => console.log("Delete account")}
+                onClick={() => void handleDeleteAccount()}
               >
                 Delete Account
               </button>
@@ -754,80 +663,6 @@ const Settings = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-/* =========================================================
-   REUSABLE TOGGLE
-========================================================= */
-
-type SettingToggleProps = {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  checked: boolean;
-  onChange?: () => void;
-};
-
-const SettingToggle = ({
-  icon,
-  title,
-  description,
-  checked,
-  onChange,
-}: SettingToggleProps) => {
-  return (
-    <div className="setting-toggle-row">
-      <div className="setting-toggle-information">
-        <div className="setting-toggle-icon">{icon}</div>
-
-        <div>
-          <h3>{title}</h3>
-
-          <p>{description}</p>
-        </div>
-      </div>
-
-      <label className="settings-switch">
-        <input type="checkbox" checked={checked} onChange={onChange} />
-
-        <span className="settings-slider" />
-      </label>
-    </div>
-  );
-};
-
-/* =========================================================
-   PRIVACY ROW
-========================================================= */
-
-type PrivacyRowProps = {
-  title: string;
-  description: string;
-  checked: boolean;
-};
-
-const PrivacyRow = ({ title, description, checked }: PrivacyRowProps) => {
-  return (
-    <div className="setting-toggle-row">
-      <div className="setting-toggle-information">
-        <div className="setting-toggle-icon">
-          <Shield size={21} />
-        </div>
-
-        <div>
-          <h3>{title}</h3>
-
-          <p>{description}</p>
-        </div>
-      </div>
-
-      <label className="settings-switch">
-        <input type="checkbox" defaultChecked={checked} />
-
-        <span className="settings-slider" />
-      </label>
     </div>
   );
 };

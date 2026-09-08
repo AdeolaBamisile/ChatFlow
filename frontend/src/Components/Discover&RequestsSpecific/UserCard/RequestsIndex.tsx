@@ -1,29 +1,26 @@
-import type { RequestUser } from "../../../types";
+import type { FriendRequest } from "../../../types";
 import RequestsButtons from "./RequestsButtons";
 import UserPictureName from "./UserPictuteName";
 
 interface UserCardProps {
-  user: RequestUser;
-  addFriend: (user: RequestUser) => void;
+  user: FriendRequest;
+  addFriend: (user: FriendRequest) => void;
+  onIgnore?: (user: FriendRequest) => void;
 }
 
-const UserCard = ({ user, addFriend }: UserCardProps) => {
-  const handleAddFriend = (user: RequestUser) => {
-    addFriend(user);
-  };
+const UserCard = ({ user, addFriend, onIgnore }: UserCardProps) => (
+  <article className="user-card">
+    <UserPictureName user={user} />
 
-  return (
-    <article className="user-card">
-      {/* User information at top */}
-      <UserPictureName user={user} />
-      <p className="user-bio">{user.bio}</p>
+    <p className="user-bio">{user.bio}</p>
+    <div className="card-divider" />
 
-      <div className="card-divider" />
-
-      {/* Bottom row */}
-      <RequestsButtons user={user} handleAddFriend={handleAddFriend} />
-    </article>
-  );
-};
+    <RequestsButtons
+      user={user}
+      handleAddFriend={addFriend}
+      onIgnore={onIgnore}
+    />
+  </article>
+);
 
 export default UserCard;

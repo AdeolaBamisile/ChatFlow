@@ -1,149 +1,87 @@
 import { useState } from "react";
+
 import { Search } from "lucide-react";
-import type { RequestUser as User } from "../types";
+
+import {
+  useApolloClient,
+  useMutation,
+  useQuery,
+  useSubscription,
+} from "@apollo/client/react";
+
 import FilterButton from "../Components/Discover&RequestsSpecific/FilterButton";
 import UserCard from "../Components/Discover&RequestsSpecific/UserCard/RequestsIndex";
 
-const users: User[] = [
-  {
-    id: 2,
-    name: "Sarah Williams",
-    username: "@sarah.will",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=SarahWilliams",
-    bio: "Frontend developer & coffee enthusiast ☕",
-    mutualFriends: 18,
-    request: "sent",
-  },
-  {
-    id: 12,
-    name: "Isabella Rossi",
-    username: "@isabella.rossi",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=IsabellaRossi",
-    bio: "Travel lover exploring the world & cultures.",
-    mutualFriends: 15,
-    request: "recieved",
-  },
-  {
-    id: 7,
-    name: "Daniel Lee",
-    username: "@daniel.lee",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=DanielLee",
-    bio: "Tech enthusiast and open source contributor.",
-    mutualFriends: 21,
-    request: "recieved",
-  },
-  {
-    id: 6,
-    name: "Olivia Davis",
-    username: "@olivia.davis",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=OliviaDavis",
-    bio: "Digital artist & illustrator bringing ideas to life 🎨",
-    mutualFriends: 14,
-    request: "sent",
-  },
-  {
-    id: 1,
-    name: "David Jones",
-    username: "@david.jones",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=DavidJones",
-    bio: "Product designer who loves creating meaningful experiences.",
-    mutualFriends: 14,
-    request: "recieved",
-  },
-  {
-    id: 3,
-    name: "Alex Morgan",
-    username: "@alex.morgan",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=AlexMorgan",
-    bio: "Photographer capturing life one frame at a time 📸",
-    mutualFriends: 32,
-    request: "recieved",
-  },
-  {
-    id: 4,
-    name: "Emily Carter",
-    username: "@emily.carter",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=EmilyCarter",
-    bio: "UX researcher passionate about human-centered design.",
-    mutualFriends: 16,
-    request: "sent",
-  },
-  {
-    id: 5,
-    name: "Michael Brown",
-    username: "@michael.brown",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=MichaelBrown",
-    bio: "Backend engineer building scalable applications.",
-    mutualFriends: 27,
-    request: "recieved",
-  },
-  {
-    id: 8,
-    name: "Sophia Martinez",
-    username: "@sophia.martinez",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=SophiaMartinez",
-    bio: "Marketing strategist helping brands tell their story.",
-    mutualFriends: 12,
-    request: "sent",
-  },
-  {
-    id: 9,
-    name: "James Wilson",
-    username: "@james.wilson",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=JamesWilson",
-    bio: "Fitness enthusiast and healthy lifestyle advocate.",
-    mutualFriends: 19,
-    request: "recieved",
-  },
-  {
-    id: 10,
-    name: "Aisha Khan",
-    username: "@aisha.khan",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=AishaKhan",
-    bio: "Data analyst turning data into actionable insights.",
-    mutualFriends: 22,
-    request: "recieved",
-  },
-  {
-    id: 11,
-    name: "Chris Taylor",
-    username: "@chris.taylor",
-    avatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=ChrisTaylor",
-    bio: "Entrepreneur building digital products.",
-    mutualFriends: 17,
-    request: "sent",
-  },
-];
+import {
+  ACCEPT_FRIEND_REQUEST_MUTATION,
+  CHATS_QUERY,
+  FRIEND_REQUESTS_QUERY,
+  FRIEND_REQUEST_SUBSCRIPTION,
+  IGNORE_FRIEND_REQUEST_MUTATION,
+  REMOVE_FRIEND_REQUEST_MUTATION,
+} from "../services/graphql";
 
-const categories = ["All", "Sent", "Recieved"];
+import type { FriendRequest } from "../types";
 
 const Requests = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
 
-  const filteredUsers = users.filter((user) => {
-    if (activeCategory === "All") return user;
-    else if (activeCategory === "Sent") return user.request === "sent";
-    else if (activeCategory === "Recieved") return user.request === "recieved";
-    else return;
+  const client = useApolloClient();
+
+  const status =
+    activeCategory === "Sent"
+      ? "sent"
+      : activeCategory === "Received"
+        ? "received"
+        : null;
+
+  const { data, loading, error } = useQuery<{
+    friendRequests: FriendRequest[];
+  }>(FRIEND_REQUESTS_QUERY, { variables: { status } });
+
+  const [accept] = useMutation(ACCEPT_FRIEND_REQUEST_MUTATION, {
+    refetchQueries: [
+      { query: FRIEND_REQUESTS_QUERY, variables: { status } },
+      { query: CHATS_QUERY },
+    ],
   });
 
-  const searchedUsers = filteredUsers.filter((user) => {
-    const searchValue = search.toLowerCase().trim();
+  const [ignore] = useMutation(IGNORE_FRIEND_REQUEST_MUTATION, {
+    refetchQueries: [{ query: FRIEND_REQUESTS_QUERY, variables: { status } }],
+  });
 
-    if (!searchValue) {
-      return true;
-    }
+  const [remove] = useMutation(REMOVE_FRIEND_REQUEST_MUTATION, {
+    refetchQueries: [{ query: FRIEND_REQUESTS_QUERY, variables: { status } }],
+  });
+
+  useSubscription(FRIEND_REQUEST_SUBSCRIPTION, {
+    onData: () => {
+      void client.refetchQueries({ include: [FRIEND_REQUESTS_QUERY] });
+    },
+  });
+
+  const users = (data?.friendRequests ?? []).filter((user) => {
+    const term = search.trim().toLowerCase();
 
     return (
-      user.name.toLowerCase().includes(searchValue) ||
-      user.username.toLowerCase().includes(searchValue) ||
-      user.bio.toLowerCase().includes(searchValue)
+      !term ||
+      user.name.toLowerCase().includes(term) ||
+      user.username.toLowerCase().includes(term) ||
+      user.bio.toLowerCase().includes(term)
     );
   });
 
-  const handleAddFriend = (user: User) => {
-    console.log(`Friend request sent to ${user.name}`);
+  const categories = ["All", "Sent", "Received"];
+
+  const handleAction = async (user: FriendRequest) => {
+    if (user.status === "received")
+      await accept({ variables: { requestId: user.id } });
+    else await remove({ variables: { requestId: user.id } });
+  };
+
+  const handleIgnore = async (user: FriendRequest) => {
+    await ignore({ variables: { requestId: user.id } });
   };
 
   return (
@@ -158,7 +96,6 @@ const Requests = () => {
           <div className="discover-search">
             <Search size={25} strokeWidth={1.8} />
             <input
-              type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search users by name, username or interests..."
@@ -179,8 +116,21 @@ const Requests = () => {
 
         <section className="users-container">
           <div className="users-grid">
-            {searchedUsers.map((user) => (
-              <UserCard key={user.id} user={user} addFriend={handleAddFriend} />
+            {loading && <p className="empty-state">Loading requests...</p>}
+
+            {error && <p className="empty-state">Unable to load requests.</p>}
+
+            {!loading && !users.length && (
+              <p className="empty-state">No requests here.</p>
+            )}
+
+            {users.map((user) => (
+              <UserCard
+                key={user.id}
+                user={user}
+                addFriend={handleAction}
+                onIgnore={user.status === "received" ? handleIgnore : undefined}
+              />
             ))}
           </div>
         </section>

@@ -423,6 +423,12 @@
   box-shadow: 0 7px 20px rgba(58, 89, 225, 0.27);
 }
 
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .secondary-settings-button {
   height: 42px;
   padding: 0 18px;
@@ -433,6 +439,9 @@
   cursor: pointer;
   font-size: 14px;
   transition: 0.2s ease;
+  display: flex;
+  align-items: center;
+  width: fit-content;
 }
 
 .secondary-settings-button:hover {
@@ -830,6 +839,14 @@
   font-size: 13px;
 }
 
+.account-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.085);
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+
 /* =========================================================
    DANGER ZONE
 ========================================================= */
@@ -1021,6 +1038,9 @@
 .light-mode .appearance-description,
 .light-mode .setting-toggle-information p,
 .light-mode .blocked-user-info span,
+.light-mode .account-divider {
+  background: rgba(0, 0, 0, 0.08);
+}
 .light-mode .empty-blocked p {
   color: #667080;
 }

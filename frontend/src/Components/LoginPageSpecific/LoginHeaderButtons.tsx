@@ -14,7 +14,7 @@ const LoginHeaderButtons = ({
   mode,
 }: LoginHeaderButtonsProps) => {
   return (
-    <button className={!isLogin ? "active" : ""} onClick={() => setMode(mode)}>
+    <button className={isLogin ? "active" : ""} onClick={() => setMode(mode)}>
       {label}
     </button>
   );
