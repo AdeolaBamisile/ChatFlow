@@ -1,7 +1,3 @@
-/* =========================================================
-   GEMINI PAGE CONTAINER
-========================================================= */
-
 .gemini-page {
   width: 100%;
   height: 100%;
@@ -25,10 +21,6 @@
   padding: 11px 9px 11px 9px;
 }
 
-/* =========================================================
-   HEADER (Sticky + Smooth Slide)
-========================================================= */
-
 .gemini-header {
   position: sticky;
   top: 0;
@@ -38,7 +30,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 0 12px 0;
-  background: var(--background); /* Masks content scrolling behind it */
+  background: var(--background);
   border-radius: 15px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -100,10 +92,6 @@
   margin: 0;
 }
 
-/* =========================================================
-   CHAT SCROLL AREA
-========================================================= */
-
 .gemini-chat {
   flex: 1;
   min-height: 0;
@@ -134,8 +122,6 @@
   flex-direction: column;
 }
 
-/* Date Divider */
-
 .gemini-chat .date-divider {
   width: 100%;
   display: flex;
@@ -150,10 +136,6 @@
   color: #aeb7c7;
   font-size: 11px;
 }
-
-/* =========================================================
-   MESSAGE ROWS & BUBBLES
-========================================================= */
 
 .gemini-message-row {
   display: flex;
@@ -295,10 +277,6 @@
   font-size: 10px;
 }
 
-/* =========================================================
-   TYPING INDICATOR
-========================================================= */
-
 .typing-row {
   margin-bottom: 14px;
 }
@@ -355,10 +333,6 @@
     opacity: 1;
   }
 }
-
-/* =========================================================
-   COMPOSER / INPUT (Centered & Contained)
-========================================================= */
 
 .gemini-composer-wrapper {
   width: 100%;
@@ -446,10 +420,6 @@
   transform: translateY(0);
 }
 
-/* =========================================================
-   LIGHT MODE
-========================================================= */
-
 .light-mode .gemini-title h1 {
   color: #161a21;
 }
@@ -500,10 +470,6 @@
   background-color: var(--blue);
   box-shadow: 0 0 6px var(--blue);
 }
-
-/* =========================================================
-   RESPONSIVE MEDIA QUERIES
-========================================================= */
 
 @media (max-width: 600px) {
   .gemini-main {

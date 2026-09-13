@@ -35,7 +35,7 @@ const authLink = new SetContextLink(({ headers }) => ({
 }));
 
 const httpLink = new HttpLink({
-  uri: import.meta.env.VITE_GRAPHQL_URL || "http://localhost:3001/graphql",
+  uri: "/graphql",
 });
 
 const getWsUrl = () => {
@@ -48,7 +48,7 @@ const getWsUrl = () => {
 
 const wsLink = new GraphQLWsLink(
   createClient({
-    url: import.meta.env.VITE_GRAPHQL_WS_URL || getWsUrl(),
+    url: getWsUrl(),
     connectionParams: () => ({
       authorization: getToken() ? `bearer ${getToken()}` : "",
     }),
