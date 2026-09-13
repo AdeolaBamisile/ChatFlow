@@ -6,6 +6,8 @@ import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHt
 import { makeExecutableSchema } from "@graphql-tools/schema";
 import { WebSocketServer } from "ws";
 import { useServer } from "graphql-ws/use/ws";
+import path from "node:path";
+
 import type { Context } from "./types.js";
 import { getUserFromToken } from "./utils/auth.js";
 import { pubsub } from "./utils/pubsub.js";
@@ -117,9 +119,6 @@ const startServer = async (port: number): Promise<void> => {
 
   await server.start();
 
-  //delete this line
-  app.get("/health", (_req, res) => res.json({ status: "ok" }));
-
   app.use(
     "/graphql",
     express.json({ limit: "2mb" }),
@@ -130,8 +129,13 @@ const startServer = async (port: number): Promise<void> => {
         ),
       }),
     }),
-    express.static("dist"),
   );
+
+  app.use(express.static("dist"));
+
+  app.use((_req, res) => {
+    res.sendFile(path.resolve("dist", "index.html"));
+  });
 
   httpServer.listen(port, () => {
     console.log(`Server running on port ${port}`);
