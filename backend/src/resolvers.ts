@@ -154,7 +154,10 @@ const messageView = async (message: Message) => {
 
   return {
     ...message.get(),
-    createdAt: message.createdAt.toISOString(),
+    createdAt:
+      message.createdAt instanceof Date
+        ? message.createdAt.toISOString()
+        : new Date(message.createdAt).toISOString(),
     attachment: attachment
       ? { ...attachment.get(), createdAt: attachment.createdAt.toISOString() }
       : null,
@@ -323,7 +326,10 @@ const resolver = {
   },
 
   Message: {
-    createdAt: (message: Message) => message.createdAt.toISOString(),
+    createdAt: (message: Message) =>
+      message.createdAt instanceof Date
+        ? message.createdAt.toISOString()
+        : new Date(message.createdAt).toISOString(),
 
     replyTo: async (message: Message) =>
       message.replyToId ? Message.findByPk(message.replyToId) : null,
@@ -337,7 +343,10 @@ const resolver = {
   },
 
   GeminiMessage: {
-    createdAt: (message: GeminiMessage) => message.createdAt.toISOString(),
+    createdAt: (message: GeminiMessage) =>
+      message.createdAt instanceof Date
+        ? message.createdAt.toISOString()
+        : new Date(message.createdAt).toISOString(),
   },
 
   Query: {
@@ -505,7 +514,7 @@ const resolver = {
     },
 
     chatMedia: async (
-      _: unknown,
+      _root: unknown,
       { chatId }: { chatId: string },
       { currentUser }: Context,
     ) => {
@@ -525,7 +534,7 @@ const resolver = {
     },
 
     geminiMessages: async (
-      _: unknown,
+      _root: unknown,
       { chatId }: { chatId?: string },
       { currentUser }: Context,
     ) => {
@@ -1050,43 +1059,6 @@ const resolver = {
         "profile",
       ),
 
-    createAttachment: async (
-      _root: unknown,
-      args: {
-        fileId: string;
-        type: string;
-        mimeType: string;
-        size: number;
-        name?: string;
-        duration?: number;
-      },
-      { currentUser }: Context,
-    ) => {
-      const user = requireUser(currentUser);
-
-      if (!["IMAGE", "VIDEO", "AUDIO"].includes(args.type))
-        throw new GraphQLError("Invalid attachment type");
-
-      const file = await File.findOne({
-        where: { id: args.fileId, userId: user.id },
-      });
-
-      if (!file) throw new GraphQLError("File not found");
-
-      return Attachment.create({
-        id: uuid(),
-        type: args.type,
-        url: file.publicUrl,
-        path: file.path,
-        name: args.name ?? null,
-        mimeType: args.mimeType,
-        size: args.size,
-        duration: args.duration ?? null,
-        messageId: null,
-        userId: user.id,
-      });
-    },
-
     sendGeminiMessage: async (
       _root: unknown,
       { content, chatId }: { content: string; chatId?: string },
@@ -1272,8 +1244,26 @@ async function prepareUpload(
     userId: user.id,
   });
 
+  let attachmentType = "IMAGE";
+
+  if (mimeType.startsWith("video/")) attachmentType = "VIDEO";
+  else if (mimeType.startsWith("audio/")) attachmentType = "AUDIO";
+
+  const attachment = await Attachment.create({
+    id: uuid(),
+    type: attachmentType,
+    url: publicUrl,
+    path,
+    name: fileName,
+    mimeType,
+    size,
+    messageId: null,
+    userId: user.id,
+  });
+
   return {
     fileId: file.id,
+    attachmentId: attachment.id,
     uploadUrl: data.signedUrl,
     publicUrl,
     path,

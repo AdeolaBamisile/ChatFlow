@@ -98,6 +98,7 @@ const typeDefs = /* GraphQL */ `
 
   type PreparedMedia {
     fileId: ID!
+    attachmentId: ID
     uploadUrl: String!
     publicUrl: String!
     path: String!
@@ -171,14 +172,6 @@ const typeDefs = /* GraphQL */ `
       mimeType: String!
       size: Int!
     ): PreparedMedia!
-    createAttachment(
-      fileId: ID!
-      type: String!
-      mimeType: String!
-      size: Int!
-      name: String
-      duration: Int
-    ): Attachment!
   }
 
   type Subscription {
