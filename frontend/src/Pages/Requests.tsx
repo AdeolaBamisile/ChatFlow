@@ -128,7 +128,9 @@ const Requests = () => {
           )}
 
           {!loading && error && (
-            <p className="empty-state">Unable to load requests.</p>
+            <p className="empty-state" onClick={() => console.log(error)}>
+              Unable to load requests.
+            </p>
           )}
 
           {!loading && !users.length && (

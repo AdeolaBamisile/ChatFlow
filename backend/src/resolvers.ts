@@ -316,7 +316,10 @@ const resolver = {
       return mutualCount(user.id, otherId);
     },
 
-    createdAt: (request: FriendRequest) => request.createdAt.toISOString(),
+    createdAt: (request: FriendRequest) =>
+      request.createdAt instanceof Date
+        ? request.createdAt.toISOString()
+        : new Date(request.createdAt).toISOString(),
   },
 
   Message: {
@@ -427,24 +430,33 @@ const resolver = {
     ) => {
       const user = requireUser(currentUser);
 
-      const where = status ? { status } : { status: "PENDING" };
+      const where = {
+        status: "PENDING",
+        ...(status === "sent"
+          ? { senderId: user.id }
+          : status === "received"
+            ? { receiverId: user.id }
+            : {
+                [Op.or]: [{ senderId: user.id }, { receiverId: user.id }],
+              }),
+      };
 
       const rows = await FriendRequest.findAll({
-        where: {
-          ...where,
-          [Op.or]: [{ senderId: user.id }, { receiverId: user.id }],
-        },
+        where,
         order: [["createdAt", "DESC"]],
       });
 
       return Promise.all(
         rows.map(async (request) => {
+          const isSent = request.senderId === user.id;
+
           const otherId =
             request.senderId === user.id
               ? request.receiverId
               : request.senderId;
 
           const other = await User.findByPk(otherId);
+
           if (!other) throw new GraphQLError("User not found");
 
           return {
@@ -455,8 +467,11 @@ const resolver = {
             bio: other.bio,
             online: other.onlineStatusVisible ? other.online : false,
             mutualFriends: await mutualCount(user.id, other.id),
-            status: request.status,
-            createdAt: request.createdAt.toISOString(),
+            status: isSent ? "sent" : "received",
+            createdAt:
+              request.createdAt instanceof Date
+                ? request.createdAt.toISOString()
+                : new Date(request.createdAt).toISOString(),
             senderId: request.senderId,
             receiverId: request.receiverId,
           };

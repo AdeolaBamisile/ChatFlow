@@ -450,6 +450,8 @@ const Chats = () => {
 
   const isBlocked = (chat: Chat) => Boolean(chat.blockedByFriend);
 
+  const SKELETON_COUNT = 12;
+
   return (
     <div
       className={`messaging-page ${isChatRoute ? "chat-route" : "list-route"} ${showDetails ? "details-open" : "details-closed"}`}
@@ -478,22 +480,36 @@ const Chats = () => {
           )}
         </div>
 
-        <div className="chat-items">
-          {chatsLoading && <p className="chat-empty-state">Loading chats...</p>}
-          {chatsError && (
+        <div className={`chat-items ${chatsLoading ? "is-loading-chats" : ""}`}>
+          {chatsLoading &&
+            Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+              <div className="loading-chat-row" key={index}>
+                <div className="loading-chat-avatar" />
+                <div className="loading-chat-info">
+                  <div className="loading-chat-title" />
+                  <div className="loading-chat-preview" />
+                </div>
+                <div className="moving-chat-beam" />
+              </div>
+            ))}
+
+          {!chatsLoading && chatsError && (
             <p className="chat-empty-state">Unable to load chats.</p>
           )}
+
           {!chatsLoading && !filteredChats.length && (
             <p className="chat-empty-state">No chats found.</p>
           )}
-          {filteredChats.map((chat) => (
-            <UserButton
-              key={chat.id}
-              chat={chat}
-              activeChat={selectedChat}
-              onSelect={setActiveChat}
-            />
-          ))}
+
+          {!chatsLoading &&
+            filteredChats.map((chat) => (
+              <UserButton
+                key={chat.id}
+                chat={chat}
+                activeChat={selectedChat}
+                onSelect={setActiveChat}
+              />
+            ))}
         </div>
       </section>
 
