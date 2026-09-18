@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useNavigate } from "react-router-dom";
+import { useApolloClient } from "@apollo/client/react";
 
 import PrivacyRow from "../Components/SettingsSpecific/PrivacyRow";
 
@@ -110,6 +111,8 @@ const Settings = () => {
     reset,
   } = useAppStore();
 
+  const client = useApolloClient();
+
   const profileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: meData } = useQuery<{ me: CurrentUser }>(ME_QUERY, {
@@ -211,6 +214,8 @@ const Settings = () => {
     await deleteAccount();
     reset();
     navigate("/");
+    localStorage.clear();
+    client.resetStore();
   };
 
   return (
@@ -247,6 +252,8 @@ const Settings = () => {
             onClick={() => {
               reset();
               navigate("/");
+              localStorage.clear();
+              client.resetStore();
             }}
           >
             <LogOut size={20} />

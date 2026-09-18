@@ -15,6 +15,12 @@
   scrollbar-color: #202b38 transparent;
 }
 
+.discover-content.is-loading {
+  overflow: hidden !important;
+  pointer-events: none;
+  touch-action: none;
+}
+
 .discover-content::-webkit-scrollbar {
   width: 6px;
 }
@@ -170,6 +176,47 @@
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
 }
 
+.loading-card {
+  position: relative;
+  min-width: 0;
+  height: 262px;
+  border-radius: 19px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(
+    145deg,
+    rgba(14, 23, 33, 0.85),
+    rgba(9, 16, 24, 0.75)
+  );
+  overflow: hidden;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.moving-beam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.02) 20%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.02) 80%,
+    transparent 100%
+  );
+  animation: shimmer 1.6s ease-in-out infinite;
+  will-change: transform;
+}
+
 .user-main {
   display: flex;
   align-items: center;
@@ -274,6 +321,7 @@
 .response-button {
   flex-shrink: 0;
   width: 45%;
+  min-width: 98px;
   height: 39px;
   padding: 0 16px;
   border-radius: 20px;

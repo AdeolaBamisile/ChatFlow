@@ -77,9 +77,11 @@ const Discover = () => {
 
   const categories = ["All", "Mutuals", "New Users"];
 
+  const SKELETON_COUNT = 12;
+
   return (
     <div className="discover-page">
-      <main className="discover-content">
+      <main className={`discover-content ${loading ? "is-loading" : ""}`}>
         <header className="discover-header">
           <div className="discover-title">
             <h1>Discover</h1>
@@ -107,15 +109,25 @@ const Discover = () => {
         </div>
 
         <section className="users-container">
+          {loading && (
+            <div className="users-grid">
+              {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+                <div className="loading-card" key={index}>
+                  <div className="moving-beam" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && error && (
+            <p className="empty-state">Unable to load users.</p>
+          )}
+
+          {!loading && !visibleUsers.length && (
+            <p className="empty-state">No users found.</p>
+          )}
+
           <div className="users-grid">
-            {loading && <p className="empty-state">Loading users...</p>}
-
-            {error && <p className="empty-state">Unable to load users.</p>}
-
-            {!loading && !visibleUsers.length && (
-              <p className="empty-state">No users found.</p>
-            )}
-
             {visibleUsers.map((user) => (
               <DiscoverIndex
                 key={user.id}

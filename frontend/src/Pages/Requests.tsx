@@ -84,9 +84,11 @@ const Requests = () => {
     await ignore({ variables: { requestId: user.id } });
   };
 
+  const SKELETON_COUNT = 12;
+
   return (
     <div className="discover-page">
-      <main className="discover-content">
+      <main className={`discover-content ${loading ? "is-loading" : ""}`}>
         <header className="discover-header">
           <div className="discover-title">
             <h1>Requests</h1>
@@ -115,15 +117,25 @@ const Requests = () => {
         </div>
 
         <section className="users-container">
+          {loading && (
+            <div className="users-grid">
+              {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+                <div className="loading-card" key={index}>
+                  <div className="moving-beam" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && error && (
+            <p className="empty-state">Unable to load requests.</p>
+          )}
+
+          {!loading && !users.length && (
+            <p className="empty-state">No requests here.</p>
+          )}
+
           <div className="users-grid">
-            {loading && <p className="empty-state">Loading requests...</p>}
-
-            {error && <p className="empty-state">Unable to load requests.</p>}
-
-            {!loading && !users.length && (
-              <p className="empty-state">No requests here.</p>
-            )}
-
             {users.map((user) => (
               <UserCard
                 key={user.id}
