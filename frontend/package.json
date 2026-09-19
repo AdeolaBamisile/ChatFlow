@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@apollo/client": "^4.2.12",
+    "@daily-co/daily-js": "^0.92.2",
     "graphql": "^17.0.2",
     "graphql-ws": "^6.2.1",
     "lucide-react": "^1.38.0",

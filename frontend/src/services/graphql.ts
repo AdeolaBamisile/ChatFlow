@@ -375,19 +375,20 @@ export const SEND_GEMINI_MESSAGE_MUTATION = gql`
 
 export const PREPARE_MEDIA_UPLOAD_MUTATION = gql`
   mutation PrepareMediaUpload(
-    $chatId: ID!
+    $kind: String!
     $fileName: String!
     $mimeType: String!
     $size: Int!
   ) {
     prepareMediaUpload(
-      chatId: $chatId
+      kind: $kind
       fileName: $fileName
       mimeType: $mimeType
       size: $size
     ) {
       uploadUrl
       fileId
+      attachmentId
     }
   }
 `;

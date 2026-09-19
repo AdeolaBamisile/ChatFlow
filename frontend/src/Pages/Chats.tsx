@@ -66,6 +66,18 @@ type SendGeminiMessageData = {
   sendGeminiMessage: GeminiMessage;
 };
 
+type SendMessageData = {
+  sendMessage: Message;
+};
+
+type SendMessageVariables = {
+  chatId: string;
+  content: string;
+  type: string;
+  replyToId?: string | null;
+  attachmentId?: string | null;
+};
+
 const Chats = () => {
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [message, setMessage] = useState("");
@@ -134,7 +146,9 @@ const Chats = () => {
     refetchQueries: [{ query: CHATS_QUERY }],
   });
 
-  const [sendMessage] = useMutation(SEND_MESSAGE_MUTATION);
+  const [sendMessage] = useMutation<SendMessageData, SendMessageVariables>(
+    SEND_MESSAGE_MUTATION,
+  );
   const [deleteMessage] = useMutation(DELETE_MESSAGE_MUTATION);
   const [reactMessage] = useMutation(REACT_MESSAGE_MUTATION);
   const [blockUser] = useMutation(BLOCK_USER_MUTATION, {
@@ -163,13 +177,42 @@ const Chats = () => {
         : [],
     );
 
-  useSubscription(CHAT_MESSAGE_SUBSCRIPTION, {
+  useSubscription<{ chatMessageAdded: Message }>(CHAT_MESSAGE_SUBSCRIPTION, {
     variables: { chatId: selectedChat?.id ?? "" },
-    skip: !selectedChat,
-    onData: () => {
-      void client.refetchQueries({
-        include: [MESSAGES_QUERY, MEDIA_QUERY, CHATS_QUERY],
-      });
+    skip: !selectedChat?.id,
+    onData: ({ data: subscriptionData }) => {
+      const newMessage = subscriptionData.data?.chatMessageAdded;
+      if (!newMessage || !selectedChat?.id) return;
+
+      client.cache.updateQuery<MessagesData>(
+        {
+          query: MESSAGES_QUERY,
+          variables: { chatId: selectedChat.id },
+        },
+        (existingData) => {
+          if (!existingData) return { messages: [newMessage] };
+
+          if (existingData.messages.some((m) => m.id === newMessage.id)) {
+            return existingData;
+          }
+
+          const filtered = existingData.messages.filter(
+            (m) =>
+              !(
+                m.id.startsWith("temp-") &&
+                m.senderId === newMessage.senderId &&
+                m.content === newMessage.content
+              ),
+          );
+
+          return {
+            ...existingData,
+            messages: [...filtered, newMessage],
+          };
+        },
+      );
+
+      client.refetchQueries({ include: [CHATS_QUERY] });
     },
   });
 
@@ -280,26 +323,75 @@ const Chats = () => {
       !selectedChat ||
       !message.trim() ||
       selectedChat.blockedByFriend ||
-      recording
+      recording ||
+      !currentUser
     )
       return;
 
     const content = message.trim();
-    setMessage("");
     const replyId = reply?.id ?? null;
+    const currentReply = reply;
+
+    setMessage("");
     setReply(null);
+
+    const tempId = `temp-${Date.now()}`;
+
     await sendMessage({
       variables: {
         chatId: selectedChat.id,
         content,
-        type: "text",
+        type: "TEXT",
         replyToId: replyId,
         attachmentId: null,
       },
-      refetchQueries: [
-        { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
-        { query: CHATS_QUERY },
-      ],
+
+      optimisticResponse: {
+        sendMessage: {
+          id: tempId,
+          chatId: selectedChat.id,
+          senderId: currentUser.id,
+          content,
+          type: "TEXT",
+          createdAt: new Date().toISOString(),
+          seen: false,
+          reaction: null,
+          deleted: false,
+          replyTo: currentReply
+            ? {
+                id: currentReply.id,
+                chatId: currentReply.chatId,
+                senderId: currentReply.senderId,
+                content: currentReply.content,
+                type: currentReply.type,
+                createdAt: currentReply.createdAt,
+              }
+            : null,
+          attachment: null,
+        },
+      },
+
+      update: (cache, { data }) => {
+        const sentMsg = data?.sendMessage;
+        if (!sentMsg) return;
+
+        cache.updateQuery<MessagesData>(
+          {
+            query: MESSAGES_QUERY,
+            variables: { chatId: selectedChat.id },
+          },
+          (existing) => {
+            if (!existing) return { messages: [sentMsg] };
+            if (existing.messages.some((m) => m.id === sentMsg.id))
+              return existing;
+            return {
+              ...existing,
+              messages: [...existing.messages, sentMsg],
+            };
+          },
+        );
+      },
+      refetchQueries: [{ query: CHATS_QUERY }],
     });
   };
 
@@ -312,7 +404,7 @@ const Chats = () => {
       return;
 
     const attachmentId = await upload(selectedChat.id, file);
-    const type = file.type.startsWith("image/") ? "image" : "video";
+    const type = file.type.startsWith("image/") ? "IMAGE" : "VIDEO";
     const replyId = reply?.id ?? null;
     await sendMessage({
       variables: {
@@ -380,8 +472,10 @@ const Chats = () => {
         type: recorder.mimeType || "audio/webm",
       });
 
+      const cleanAudioType = recorder.mimeType.split(";")[0] || "audio/webm";
+
       const file = new File([blob], `voice-${Date.now()}.webm`, {
-        type: blob.type,
+        type: cleanAudioType,
       });
 
       try {
@@ -390,7 +484,7 @@ const Chats = () => {
           variables: {
             chatId: selectedChat.id,
             content: "",
-            type: "voice",
+            type: "AUDIO",
             replyToId: reply?.id ?? null,
             attachmentId,
           },
@@ -434,8 +528,19 @@ const Chats = () => {
   const sendGeminiMessage = async () => {
     if (!geminiInput.trim() || isGeminiSending) return;
     const content = geminiInput.trim();
+
+    const userMessage: GeminiMessage = {
+      id: `temp-${Date.now()}`,
+      sender: "user",
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
+    setGeminiMessages((current) => [...current, userMessage]);
+
     setGeminiInput("");
     setIsGeminiSending(true);
+
     try {
       const result = await sendGemini({
         variables: { content, chatId: selectedChat?.id ?? null },
@@ -872,7 +977,7 @@ const Chats = () => {
               <div className="media-grid">
                 {media.slice(0, 4).map((item) => (
                   <div className="media-item image-preview" key={item.id}>
-                    {item.type === "video" ? (
+                    {item.type === "VIDEO" ? (
                       <video src={item.url} muted />
                     ) : (
                       <img src={item.url} alt={item.name ?? "Shared media"} />
@@ -965,7 +1070,7 @@ const Chats = () => {
 
             {selectedMedia ? (
               <div className="media-single-view">
-                {selectedMedia.type === "video" ? (
+                {selectedMedia.type === "VIDEO" ? (
                   <video src={selectedMedia.url} controls autoPlay />
                 ) : (
                   <img
@@ -983,12 +1088,12 @@ const Chats = () => {
                       className="media-overlay-item"
                       onClick={() => setSelectedMedia(item)}
                     >
-                      {item.type === "video" ? (
+                      {item.type === "VIDEO" ? (
                         <video src={item.url} muted />
                       ) : (
                         <img src={item.url} alt={item.name ?? "Shared media"} />
                       )}
-                      {item.type === "video" && <span>Video</span>}
+                      {item.type === "VIDEO" && <span>Video</span>}
                     </button>
                   ))
                 ) : (

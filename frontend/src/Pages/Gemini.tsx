@@ -58,6 +58,15 @@ const Gemini = () => {
 
     setInput("");
     setIsSending(true);
+    const userMessage: GeminiMessage = {
+      id: `temp-${Date.now()}`,
+      sender: "user",
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+
     try {
       const result = await sendGemini({ variables: { content, chatId: null } });
       if (result.data?.sendGeminiMessage)

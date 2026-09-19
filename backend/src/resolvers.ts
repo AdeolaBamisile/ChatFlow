@@ -528,7 +528,10 @@ const resolver = {
       });
 
       return Attachment.findAll({
-        where: { messageId: { [Op.in]: messages.map((m) => m.id) } },
+        where: {
+          messageId: { [Op.in]: messages.map((m) => m.id) },
+          type: { [Op.in]: ["IMAGE", "VIDEO"] },
+        },
         order: [["createdAt", "DESC"]],
       });
     },
@@ -1205,6 +1208,8 @@ async function prepareUpload(
   size: number,
   kind: string,
 ) {
+  const baseMimeType = mimeType.split(";")[0].trim().toLowerCase();
+
   const allowed =
     kind === "profile"
       ? ["image/jpeg", "image/png", "image/webp"]
@@ -1220,7 +1225,7 @@ async function prepareUpload(
           "audio/ogg",
         ];
 
-  if (!allowed.includes(mimeType))
+  if (!allowed.includes(baseMimeType))
     throw new GraphQLError("Unsupported file type");
 
   if (size > 50 * 1024 * 1024) throw new GraphQLError("File is too large");

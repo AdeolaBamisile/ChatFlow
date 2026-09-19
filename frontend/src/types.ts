@@ -44,11 +44,11 @@ export interface Chat {
   blockedByFriend?: boolean;
 }
 
-export type MessageType = "text" | "image" | "video" | "voice";
+export type MessageType = "TEXT" | "IMAGE" | "VIDEO" | "AUDIO";
 
 export interface MessageAttachment {
   id: string;
-  type: "image" | "video" | "voice";
+  type: "IMAGE" | "VIDEO" | "AUDIO";
   url: string;
   name?: string;
   mimeType?: string;

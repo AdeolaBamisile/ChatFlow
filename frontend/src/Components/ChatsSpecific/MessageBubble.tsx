@@ -1,5 +1,13 @@
-import { useState } from "react";
-import { Smile, Reply, CheckCheck, Check, Trash } from "lucide-react";
+import { useState, useRef } from "react";
+import {
+  Smile,
+  Reply,
+  CheckCheck,
+  Check,
+  Trash,
+  Play,
+  Pause,
+} from "lucide-react";
 import type { Message } from "../../types";
 
 interface MessageBubbleProps {
@@ -27,21 +35,112 @@ const ReplyPreview = ({ reply }: { reply?: Message | null }) => {
   );
 };
 
+const VoicePlayer = ({ url }: { url: string }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleTimeUpdate = () => {
+    if (!audioRef.current) return;
+    const current = audioRef.current.currentTime;
+    const total = audioRef.current.duration || 1;
+    setProgress((current / total) * 100);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setProgress(0);
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const width = rect.width;
+    const newTime = (clickX / width) * (audioRef.current.duration || 0);
+    audioRef.current.currentTime = newTime;
+  };
+
+  const formatSeconds = (sec: number) => {
+    if (!sec || isNaN(sec)) return "0:00";
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="custom-voice-note">
+      <audio
+        ref={audioRef}
+        src={url}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        preload="metadata"
+      />
+      <button
+        type="button"
+        className="voice-play-button"
+        onClick={togglePlay}
+        title={isPlaying ? "Pause" : "Play"}
+      >
+        {isPlaying ? (
+          <Pause size={17} />
+        ) : (
+          <Play size={17} fill="currentColor" />
+        )}
+      </button>
+
+      <div className="voice-timeline-container" onClick={handleSeek}>
+        <div className="voice-timeline-bar">
+          <div
+            className="voice-timeline-fill"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      <span className="voice-duration">
+        {isPlaying
+          ? formatSeconds(audioRef.current?.currentTime ?? 0)
+          : formatSeconds(duration)}
+      </span>
+    </div>
+  );
+};
+
 const Attachment = ({ message }: { message: Message }) => {
   if (!message.attachment) return null;
   const { type, url, name } = message.attachment;
 
-  if (type === "image")
+  if (type === "IMAGE")
     return (
       <img className="message-media" src={url} alt={name ?? "Shared image"} />
     );
-  if (type === "video")
+
+  if (type === "VIDEO")
     return (
       <video className="message-media" src={url} controls preload="metadata" />
     );
-  return (
-    <audio className="message-voice" src={url} controls preload="metadata" />
-  );
+
+  return <VoicePlayer url={url} />;
 };
 
 export const MessageBubble = ({

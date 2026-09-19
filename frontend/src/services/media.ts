@@ -2,33 +2,45 @@ import { useMutation } from "@apollo/client/react";
 import { PREPARE_MEDIA_UPLOAD_MUTATION } from "./graphql";
 
 interface UploadResponse {
-  prepareMediaUpload: { uploadUrl: string; fileId: string };
+  prepareMediaUpload: {
+    uploadUrl: string;
+    fileId: string;
+    attachmentId: string;
+  };
 }
 
 export const useMediaUpload = () => {
-  const [prepareUpload] = useMutation<UploadResponse>(PREPARE_MEDIA_UPLOAD_MUTATION);
+  const [prepareUpload] = useMutation<UploadResponse>(
+    PREPARE_MEDIA_UPLOAD_MUTATION,
+  );
 
-  const upload = async (chatId: string, file: File) => {
+  const upload = async (kind: string, file: File) => {
     const { data } = await prepareUpload({
       variables: {
-        chatId,
+        kind,
         fileName: file.name,
         mimeType: file.type,
         size: file.size,
       },
     });
 
-    if (!data?.prepareMediaUpload) throw new Error("The server did not return an upload URL.");
-    if (!data.prepareMediaUpload.uploadUrl) return data.prepareMediaUpload.fileId;
+    if (!data?.prepareMediaUpload)
+      throw new Error("The server did not return an upload URL.");
 
-    const response = await fetch(data.prepareMediaUpload.uploadUrl, {
+    if (!data.prepareMediaUpload.uploadUrl)
+      return data.prepareMediaUpload.fileId;
+
+    const { uploadUrl, attachmentId } = data.prepareMediaUpload;
+
+    const response = await fetch(uploadUrl, {
       method: "PUT",
       headers: { "Content-Type": file.type },
       body: file,
     });
 
     if (!response.ok) throw new Error("The media upload failed.");
-    return data.prepareMediaUpload.fileId;
+
+    return attachmentId;
   };
 
   return { upload };
