@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  build: { chunkSizeWarningLimit: 700 },
+  build: { chunkSizeWarningLimit: 800 },
   server: {
     proxy: {
       "/graphql": {

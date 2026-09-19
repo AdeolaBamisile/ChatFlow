@@ -19,3 +19,4 @@ export const SUPABASE_KEY = required("SUPABASE_KEY");
 export const SUPABASE_BUCKET = required("SUPABASE_BUCKET");
 export const SUPABASE_URL = required("SUPABASE_URL");
 export const SUPABASE_UPLOAD_EXPIRES = Number(process.env.SUPABASE_UPLOAD_EXPIRES ?? 3600);
+export const DAILY_API_KEY = required("DAILY_API_KEY");

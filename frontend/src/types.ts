@@ -42,6 +42,7 @@ export interface Chat {
   muted: boolean;
   pinned: boolean;
   blockedByFriend?: boolean;
+  blockedByMe?: boolean;
 }
 
 export type MessageType = "TEXT" | "IMAGE" | "VIDEO" | "AUDIO";
@@ -121,4 +122,20 @@ export interface AppSettings {
 export interface PaginationInput {
   limit?: number;
   offset?: number;
+}
+
+export interface CallParticipant {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string;
+}
+
+export interface CallInfo {
+  id: string;
+  type: "audio" | "video";
+  roomUrl: string;
+  token: string;
+  caller: CallParticipant;
+  receiver: CallParticipant;
 }

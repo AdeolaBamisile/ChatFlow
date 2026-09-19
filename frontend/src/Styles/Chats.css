@@ -2605,3 +2605,223 @@
     padding: 10px;
   }
 }
+
+/* =====================================================
+   CALL OVERLAY
+====================================================== */
+.call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(4, 8, 15, 0.56);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.call-overlay-panel {
+  position: relative;
+  width: min(900px, 100%);
+  min-height: 540px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  background: linear-gradient(145deg, #151e2b, #0e151f);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.call-close-button {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: #dce3ef;
+}
+
+.call-avatar {
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--blue-light);
+  box-shadow: 0 0 0 8px rgba(81, 117, 255, 0.08);
+}
+
+.call-overlay-panel > h2,
+.call-audio-area h2 {
+  margin: 22px 0 4px;
+  font-size: 25px;
+}
+
+.call-overlay-panel > p,
+.call-audio-area p {
+  margin: 0;
+  color: #9ea9bb;
+}
+
+.call-status {
+  margin-top: 14px;
+  color: #8ea8ff;
+  font-size: 14px;
+}
+
+.call-incoming-actions,
+.call-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 34px;
+}
+
+.call-incoming-actions button,
+.call-controls button {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #222d3d;
+  color: white;
+}
+
+.call-accept-button {
+  background: #2fae68 !important;
+}
+
+.call-decline-button,
+.call-end-button {
+  background: #d84c59 !important;
+}
+
+.call-video-area {
+  position: absolute;
+  inset: 0;
+  background: #080d14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.call-remote-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.call-local-video {
+  position: absolute;
+  right: 22px;
+  top: 22px;
+  width: 170px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #111823;
+  z-index: 2;
+}
+
+.call-video-placeholder,
+.call-audio-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.call-video-placeholder {
+  position: absolute;
+  inset: 0;
+  gap: 15px;
+  background: #0b111a;
+}
+
+.call-video-placeholder span {
+  color: #aeb8c8;
+  font-size: 14px;
+}
+
+.call-audio-area {
+  position: absolute;
+  inset: 0;
+}
+
+.call-header-info {
+  position: absolute;
+  left: 22px;
+  top: 18px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.call-header-info span {
+  font-weight: 650;
+}
+
+.call-header-info small {
+  color: #aab5c6;
+}
+
+.call-controls {
+  position: absolute;
+  bottom: 25px;
+  z-index: 3;
+  margin: 0;
+}
+
+.call-overlay-panel > .call-controls button:hover,
+.call-incoming-actions button:hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 700px) {
+  .call-overlay {
+    padding: 10px;
+  }
+
+  .call-overlay-panel {
+    min-height: calc(100vh - 20px);
+    border-radius: 22px;
+  }
+
+  .call-local-video {
+    width: 125px;
+    height: 85px;
+    right: 14px;
+    top: 14px;
+  }
+}
+
+.light-mode .call-overlay-panel {
+  background: linear-gradient(145deg, #f7f9fc, #e9edf5);
+  color: #172033;
+}
+
+.conversation-actions button:disabled,
+.profile-action:disabled,
+.composer-button:disabled,
+.composer-actions button:disabled,
+.message-composer textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message-composer textarea:disabled {
+  color: #858e9d;
+  cursor: not-allowed;
+}

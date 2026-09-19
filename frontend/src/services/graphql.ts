@@ -33,6 +33,8 @@ export const CHATS_QUERY = gql`
         bio
         online
       }
+      blockedByFriend
+      blockedByMe
     }
   }
 `;
@@ -266,6 +268,8 @@ export const UPDATE_CHAT_MUTATION = gql`
         bio
         online
       }
+      blockedByFriend
+      blockedByMe
     }
   }
 `;
@@ -443,6 +447,8 @@ export const CHAT_UPDATED_SUBSCRIPTION = gql`
         bio
         online
       }
+      blockedByFriend
+      blockedByMe
     }
   }
 `;
@@ -489,5 +495,73 @@ export const PREPARE_PROFILE_UPLOAD_MUTATION = gql`
       fileId
       publicUrl
     }
+  }
+`;
+
+export const USER_PRESENCE_SUBSCRIPTION = gql`
+  subscription UserPresenceChanged {
+    userPresenceChanged {
+      id
+      online
+      onlineStatusVisible
+    }
+  }
+`;
+
+export const START_CALL_MUTATION = gql`
+  mutation StartCall($userId: ID!, $type: String!) {
+    startCall(userId: $userId, type: $type) {
+      id
+      type
+      roomUrl
+      token
+      caller {
+        id
+        name
+        username
+        avatar
+      }
+      receiver {
+        id
+        name
+        username
+        avatar
+      }
+    }
+  }
+`;
+
+export const END_CALL_MUTATION = gql`
+  mutation EndCall($callId: ID!) {
+    endCall(callId: $callId)
+  }
+`;
+
+export const INCOMING_CALL_SUBSCRIPTION = gql`
+  subscription IncomingCall {
+    incomingCall {
+      id
+      type
+      roomUrl
+      token
+      caller {
+        id
+        name
+        username
+        avatar
+      }
+      receiver {
+        id
+        name
+        username
+        avatar
+      }
+    }
+  }
+`;
+
+export const CALL_ENDED_SUBSCRIPTION = gql`
+  subscription CallEnded {
+    callEnded
   }
 `;

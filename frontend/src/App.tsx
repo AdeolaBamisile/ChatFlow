@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client/react";
 
 import {
   Route,
@@ -27,15 +27,19 @@ import Settings from "./Pages/Settings";
 
 import { useAppStore } from "./store";
 import {
+  CALL_ENDED_SUBSCRIPTION,
   CREATE_ACCOUNT_MUTATION,
+  INCOMING_CALL_SUBSCRIPTION,
   LOGIN_MUTATION,
   ME_QUERY,
+  USER_PRESENCE_SUBSCRIPTION,
 } from "./services/graphql";
 
 import SideNavigationMenu from "./Components/AppSpecific/SideNavigationMenu";
 import BottomNavigationMenu from "./Components/AppSpecific/BottomNavigationMenu";
 
-import type { CurrentUser } from "./types";
+import type { CallInfo, CurrentUser } from "./types";
+import CallOverlay from "./Components/CallOverlay";
 
 const Logo = () => (
   <img
@@ -57,8 +61,18 @@ const App = () => {
   const [mobileProfileOpen, setMobileProfileOpen] = useState(false);
   const [authError, setAuthError] = useState("");
 
-  const { theme, accentColor, currentUser, setTheme, setCurrentUser, reset } =
-    useAppStore();
+  const {
+    theme,
+    accentColor,
+    currentUser,
+    setTheme,
+    setCurrentUser,
+    setCall,
+    clearCall,
+    reset,
+  } = useAppStore();
+
+  const client = useApolloClient();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -72,6 +86,41 @@ const App = () => {
   const [login, { loading: isLoggingIn }] = useMutation<{
     login: { token: string; user: CurrentUser };
   }>(LOGIN_MUTATION);
+
+  useSubscription<{ userPresenceChanged: CurrentUser }>(USER_PRESENCE_SUBSCRIPTION, {
+    skip: !currentUser,
+    onData: ({ data }) => {
+      const user = data.data?.userPresenceChanged;
+      if (!user) return;
+
+      const cacheId = client.cache.identify({ __typename: "User", id: user.id });
+      if (cacheId) {
+        client.cache.modify({
+          id: cacheId,
+          fields: {
+            online: () => user.online,
+          },
+        });
+      }
+    },
+  });
+
+  useSubscription<{ incomingCall: CallInfo }>(INCOMING_CALL_SUBSCRIPTION, {
+    skip: !currentUser,
+    onData: ({ data }) => {
+      const incoming = data.data?.incomingCall;
+      if (incoming) setCall(incoming, true);
+    },
+  });
+
+  useSubscription<{ callEnded: string }>(CALL_ENDED_SUBSCRIPTION, {
+    skip: !currentUser,
+    onData: ({ data }) => {
+      const endedId = data.data?.callEnded;
+      const activeCall = useAppStore.getState().call;
+      if (endedId && activeCall?.id === endedId) clearCall();
+    },
+  });
 
   const [createAccount, { loading: isCreatingAccount }] = useMutation<{
     createAccount: { token: string; user: CurrentUser };
@@ -216,6 +265,8 @@ const App = () => {
           />
         </Routes>
       </main>
+
+      <CallOverlay />
 
       <nav className="mobile-bottom-navigation">
         <BottomNavigationMenu to="/" title="Chats" icon={<MessageCircle />} />

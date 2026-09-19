@@ -105,6 +105,16 @@ const typeDefs = /* GraphQL */ `
     token: String!
   }
 
+
+  type Call {
+    id: ID!
+    type: String!
+    roomUrl: String!
+    token: String!
+    caller: User!
+    receiver: User!
+  }
+
   type Reaction {
     messageId: ID!
     emoji: String!
@@ -172,6 +182,8 @@ const typeDefs = /* GraphQL */ `
       mimeType: String!
       size: Int!
     ): PreparedMedia!
+    startCall(userId: ID!, type: String!): Call!
+    endCall(callId: ID!): Boolean!
   }
 
   type Subscription {
@@ -180,6 +192,8 @@ const typeDefs = /* GraphQL */ `
     friendRequestChanged: FriendRequest!
     geminiMessageAdded(chatId: ID): GeminiMessage!
     userPresenceChanged: User!
+    incomingCall: Call!
+    callEnded: ID!
   }
 `;
 

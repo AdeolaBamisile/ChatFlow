@@ -33,6 +33,7 @@ import {
   SUPABASE_BUCKET,
   SUPABASE_KEY,
   SUPABASE_URL,
+  DAILY_API_KEY,
   // SUPABASE_UPLOAD_EXPIRES,
 } from "./utils/config.js";
 
@@ -41,6 +42,8 @@ import type { Context } from "./types.js";
 const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const DEFAULT_AVATAR = `https://rholprurkjaqsgdwywid.supabase.co/storage/v1/object/public/testing/projectImagesVideos/default_profile_picture.png`;
+
+const activeCalls = new Map<string, { callerId: string; receiverId: string }>();
 
 const cleanUser = (user: User) => ({
   id: user.id,
@@ -923,6 +926,15 @@ const resolver = {
         defaults: { id: uuid(), blockerId: user.id, blockedId: userId },
       });
 
+      const memberships = await ChatMember.findAll({
+        where: { userId: { [Op.in]: [user.id, userId] } },
+      });
+      const chatIds = [...new Set(memberships.map((member) => member.chatId))];
+      for (const chatId of chatIds) {
+        const chat = await Chat.findByPk(chatId);
+        if (chat) await publishChat(chat.id, [user.id, userId]);
+      }
+
       return true;
     },
 
@@ -934,6 +946,16 @@ const resolver = {
       const user = requireUser(currentUser);
 
       await Block.destroy({ where: { blockerId: user.id, blockedId: userId } });
+
+      const memberships = await ChatMember.findAll({
+        where: { userId: { [Op.in]: [user.id, userId] } },
+      });
+      const chatIds = [...new Set(memberships.map((member) => member.chatId))];
+      for (const chatId of chatIds) {
+        const chat = await Chat.findByPk(chatId);
+        if (chat) await publishChat(chat.id, [user.id, userId]);
+      }
+
       return true;
     },
 
@@ -1061,6 +1083,118 @@ const resolver = {
         args.size,
         "profile",
       ),
+
+    startCall: async (
+      _root: unknown,
+      { userId, type }: { userId: string; type: string },
+      { currentUser }: Context,
+    ) => {
+      const user = requireUser(currentUser);
+      if (user.id === userId) throw new GraphQLError("You cannot call yourself");
+      if (type !== "audio" && type !== "video")
+        throw new GraphQLError("Invalid call type");
+
+      const target = await User.findByPk(userId);
+      if (!target || target.deletedAt) throw new GraphQLError("User not found");
+      if (await isBlockedEitherWay(user.id, userId))
+        throw new GraphQLError("Calls are unavailable because one of you has blocked the other");
+
+      const memberships = await ChatMember.findAll({
+        where: { userId: { [Op.in]: [user.id, userId] } },
+      });
+      const chatIds = new Map<string, number>();
+      for (const member of memberships)
+        chatIds.set(member.chatId, (chatIds.get(member.chatId) ?? 0) + 1);
+      const chatId = [...chatIds.entries()].find(([, count]) => count === 2)?.[0];
+      if (!chatId) throw new GraphQLError("Chat not found");
+
+      const callId = uuid();
+      const roomName = `chatflow-${callId}`;
+      const roomResponse = await fetch("https://api.daily.co/v1/rooms", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${DAILY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: roomName,
+          privacy: "private",
+          properties: {
+            max_participants: 2,
+            exp: Math.floor(Date.now() / 1000) + 60 * 60,
+            start_video_off: type === "audio",
+          },
+        }),
+      });
+
+      if (!roomResponse.ok)
+        throw new GraphQLError("Could not create the call room");
+
+      const room = (await roomResponse.json()) as { url?: string; name?: string };
+      if (!room.url || !room.name) throw new GraphQLError("Invalid call room response");
+
+      const createToken = async (userName: string) => {
+        const response = await fetch("https://api.daily.co/v1/meeting-tokens", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${DAILY_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            properties: {
+              room_name: room.name,
+              user_name: userName,
+              exp: Math.floor(Date.now() / 1000) + 60 * 60,
+            },
+          }),
+        });
+        if (!response.ok) throw new GraphQLError("Could not create the call token");
+        const result = (await response.json()) as { token?: string };
+        if (!result.token) throw new GraphQLError("Invalid call token response");
+        return result.token;
+      };
+
+      const [callerToken, receiverToken] = await Promise.all([
+        createToken(user.name),
+        createToken(target.name),
+      ]);
+
+      const call = {
+        id: callId,
+        type,
+        roomUrl: room.url,
+        token: callerToken,
+        caller: cleanUser(user),
+        receiver: cleanUser(target),
+      };
+
+      activeCalls.set(callId, { callerId: user.id, receiverId: target.id });
+
+      await pubsub.publish(`INCOMING_CALL_${target.id}`, {
+        incomingCall: { ...call, token: receiverToken },
+      });
+
+      return call;
+    },
+
+    endCall: async (
+      _root: unknown,
+      { callId }: { callId: string },
+      { currentUser }: Context,
+    ) => {
+      const user = requireUser(currentUser);
+      const call = activeCalls.get(callId);
+      if (!call) return true;
+      if (call.callerId !== user.id && call.receiverId !== user.id)
+        throw new GraphQLError("Call not found");
+
+      await Promise.all([
+        pubsub.publish(`CALL_ENDED_${call.callerId}`, { callEnded: callId }),
+        pubsub.publish(`CALL_ENDED_${call.receiverId}`, { callEnded: callId }),
+      ]);
+      activeCalls.delete(callId);
+      return true;
+    },
 
     sendGeminiMessage: async (
       _root: unknown,
@@ -1196,6 +1330,20 @@ const resolver = {
         if (!currentUser) throw new GraphQLError("You must be logged in");
 
         return pubsub.asyncIterableIterator(`PRESENCE_${currentUser.id}`);
+      },
+    },
+
+    incomingCall: {
+      subscribe: (_root: unknown, _args: unknown, { currentUser }: Context) => {
+        if (!currentUser) throw new GraphQLError("You must be logged in");
+        return pubsub.asyncIterableIterator(`INCOMING_CALL_${currentUser.id}`);
+      },
+    },
+
+    callEnded: {
+      subscribe: (_root: unknown, _args: unknown, { currentUser }: Context) => {
+        if (!currentUser) throw new GraphQLError("You must be logged in");
+        return pubsub.asyncIterableIterator(`CALL_ENDED_${currentUser.id}`);
       },
     },
   },

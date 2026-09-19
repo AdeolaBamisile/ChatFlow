@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AccentColor, AppSettings, CurrentUser, Theme } from "./types";
+import type { AccentColor, AppSettings, CallInfo, CurrentUser, Theme } from "./types";
 
 interface AppStore extends AppSettings {
   currentUser: CurrentUser | null;
@@ -10,6 +10,10 @@ interface AppStore extends AppSettings {
   updateCurrentUser: (changes: Partial<CurrentUser>) => void;
   setOnlineStatusVisible: (value: boolean) => void;
   setAllowFriendRequests: (value: boolean) => void;
+  call: CallInfo | null;
+  callIncoming: boolean;
+  setCall: (call: CallInfo | null, incoming?: boolean) => void;
+  clearCall: () => void;
   reset: () => void;
 }
 
@@ -25,6 +29,8 @@ export const useAppStore = create<AppStore>()(
     (set) => ({
       ...defaults,
       currentUser: null,
+      call: null,
+      callIncoming: false,
       setTheme: (theme) => set(() => ({ theme })),
       setAccentColor: (accentColor) => set(() => ({ accentColor })),
       setCurrentUser: (currentUser) => set(() => ({ currentUser })),
@@ -38,7 +44,9 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ onlineStatusVisible })),
       setAllowFriendRequests: (allowFriendRequests) =>
         set(() => ({ allowFriendRequests })),
-      reset: () => set({ ...defaults, currentUser: null }),
+      setCall: (call, incoming = false) => set(() => ({ call, callIncoming: incoming })),
+      clearCall: () => set(() => ({ call: null, callIncoming: false })),
+      reset: () => set({ ...defaults, currentUser: null, call: null, callIncoming: false }),
     }),
     {
       name: "chatflow-settings",

@@ -101,3 +101,7 @@ Pin and mute are stored on `chat_members`, because they belong to one user in on
 ## Existing database warning
 
 The original project already had a users migration. The new migration adds the fields needed by the completed backend and creates the remaining tables. If an old development database already contains users, those old users do not have a password hash because the original schema did not store one. New accounts created through this backend have bcrypt password hashes. For a development database, recreating the database is the simplest clean start.
+
+## Daily calls
+
+The call overlay uses `@daily-co/daily-js`. The backend keeps the Daily API key private and creates a short-lived private Daily room and meeting tokens when a call starts. Add your Daily API key to `DAILY_API_KEY` in `.env` before starting the server.

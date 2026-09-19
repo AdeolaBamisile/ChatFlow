@@ -40,7 +40,7 @@ const httpLink = new HttpLink({
 
 const getWsUrl = () => {
   const host = window.location.host;
-  const protocol = window.location.protocol === "https" ? "wss" : "ws";
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
   console.log(`${protocol}//${host}/graphql`);
   return `${protocol}//${host}/graphql`;

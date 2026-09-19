@@ -72,6 +72,10 @@ type ChangeEmailData = {
   changeEmail: CurrentUser;
 };
 
+type UpdatePrivacyData = {
+  updatePrivacy: CurrentUser;
+};
+
 const accentColors: AccentColor[] = [
   "blue",
   "purple",
@@ -127,7 +131,9 @@ const Settings = () => {
     UPDATE_PROFILE_MUTATION,
   );
 
-  const [updatePrivacy] = useMutation(UPDATE_PRIVACY_MUTATION);
+  const [updatePrivacy] = useMutation<UpdatePrivacyData>(
+    UPDATE_PRIVACY_MUTATION,
+  );
   const [unblock] = useMutation(UNBLOCK_USER_MUTATION);
   const [changePassword] = useMutation(CHANGE_PASSWORD_MUTATION);
   const [changeEmail] = useMutation<ChangeEmailData>(CHANGE_EMAIL_MUTATION);
@@ -194,11 +200,45 @@ const Settings = () => {
     onlineStatusVisible: boolean,
     allowFriendRequests: boolean,
   ) => {
-    await updatePrivacy({
-      variables: { onlineStatusVisible, allowFriendRequests },
-    });
+    const previous = currentUser
+      ? {
+          onlineStatusVisible: currentUser.onlineStatusVisible,
+          allowFriendRequests: currentUser.allowFriendRequests,
+        }
+      : null;
+
+    updateCurrentUser({ onlineStatusVisible, allowFriendRequests });
     setOnlineStatusVisible(onlineStatusVisible);
     setAllowFriendRequests(allowFriendRequests);
+
+    try {
+      const result = await updatePrivacy({
+        variables: { onlineStatusVisible, allowFriendRequests },
+        optimisticResponse: {
+          updatePrivacy: {
+            ...currentUser,
+            id: currentUser?.id!,
+            name: currentUser?.name!,
+            username: currentUser?.username!,
+            email: currentUser?.email,
+            avatar: currentUser?.avatar!,
+            bio: currentUser?.bio!,
+            online: currentUser?.online ?? false,
+            onlineStatusVisible,
+            allowFriendRequests,
+          },
+        },
+      });
+
+      const updated = result.data?.updatePrivacy as CurrentUser | undefined;
+      if (updated) updateCurrentUser(updated);
+    } catch {
+      if (previous) {
+        updateCurrentUser(previous);
+        setOnlineStatusVisible(previous.onlineStatusVisible);
+        setAllowFriendRequests(previous.allowFriendRequests);
+      }
+    }
   };
 
   const menuItems = [

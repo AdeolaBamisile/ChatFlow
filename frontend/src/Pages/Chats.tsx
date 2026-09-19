@@ -38,6 +38,8 @@ import {
   REACT_MESSAGE_MUTATION,
   SEND_GEMINI_MESSAGE_MUTATION,
   SEND_MESSAGE_MUTATION,
+  START_CALL_MUTATION,
+  UNBLOCK_USER_MUTATION,
   UPDATE_CHAT_MUTATION,
 } from "../services/graphql";
 
@@ -45,7 +47,7 @@ import UserButton from "../Components/ChatsSpecific/UserButton";
 import FilterButtons from "../Components/ChatsSpecific/FilterButtons";
 import { MessageBubble } from "../Components/ChatsSpecific/MessageBubble";
 
-import { useCurrentUser } from "../store";
+import { useAppStore, useCurrentUser } from "../store";
 import { useMediaUpload } from "../services/media";
 
 import type {
@@ -54,6 +56,7 @@ import type {
   ChatFilterOptions,
   MessageAttachment,
   GeminiMessage,
+  CallInfo,
 } from "../types";
 
 const GeminiIcon =
@@ -76,6 +79,10 @@ type SendMessageVariables = {
   type: string;
   replyToId?: string | null;
   attachmentId?: string | null;
+};
+
+type UpdateChatData = {
+  updateChat: Chat;
 };
 
 const Chats = () => {
@@ -110,6 +117,7 @@ const Chats = () => {
 
   const { chatId } = useParams<{ chatId: string }>();
   const currentUser = useCurrentUser();
+  const setCall = useAppStore((state) => state.setCall);
   const client = useApolloClient();
   const isChatRoute = Boolean(chatId);
 
@@ -142,8 +150,19 @@ const Chats = () => {
     skip: !selectedChat,
   });
 
-  const [updateChat] = useMutation(UPDATE_CHAT_MUTATION, {
-    refetchQueries: [{ query: CHATS_QUERY }],
+  const [updateChat] = useMutation<UpdateChatData>(UPDATE_CHAT_MUTATION, {
+    update: (cache, { data }) => {
+      const updated = data?.updateChat;
+      if (!updated) return;
+      cache.updateQuery<ChatQueryData>({ query: CHATS_QUERY }, (existing) => {
+        if (!existing) return existing;
+        return {
+          chats: existing.chats.map((chat) =>
+            chat.id === updated.id ? updated : chat,
+          ),
+        };
+      });
+    },
   });
 
   const [sendMessage] = useMutation<SendMessageData, SendMessageVariables>(
@@ -151,9 +170,9 @@ const Chats = () => {
   );
   const [deleteMessage] = useMutation(DELETE_MESSAGE_MUTATION);
   const [reactMessage] = useMutation(REACT_MESSAGE_MUTATION);
-  const [blockUser] = useMutation(BLOCK_USER_MUTATION, {
-    refetchQueries: [{ query: CHATS_QUERY }],
-  });
+  const [blockUser] = useMutation(BLOCK_USER_MUTATION);
+  const [unblockUser] = useMutation(UNBLOCK_USER_MUTATION);
+  const [startCall] = useMutation<{ startCall: CallInfo }>(START_CALL_MUTATION);
 
   const [sendGemini] = useMutation<SendGeminiMessageData>(
     SEND_GEMINI_MESSAGE_MUTATION,
@@ -211,14 +230,34 @@ const Chats = () => {
           };
         },
       );
-
-      client.refetchQueries({ include: [CHATS_QUERY] });
     },
   });
 
-  useSubscription(CHAT_UPDATED_SUBSCRIPTION, {
-    onData: () => {
-      void client.refetchQueries({ include: [CHATS_QUERY] });
+  useSubscription<{ chatUpdated: Chat }>(CHAT_UPDATED_SUBSCRIPTION, {
+    onData: ({ data }) => {
+      const updated = data.data?.chatUpdated;
+      if (!updated) return;
+
+      client.cache.updateQuery<ChatQueryData>(
+        { query: CHATS_QUERY },
+        (existing) => {
+          if (!existing) return existing;
+          const exists = existing.chats.some((chat) => chat.id === updated.id);
+          return {
+            chats: exists
+              ? existing.chats.map((chat) =>
+                  chat.id === updated.id ? updated : chat,
+                )
+              : [...existing.chats, updated],
+          };
+        },
+      );
+
+      if (selectedChat?.id === updated.id) {
+        void client.refetchQueries({
+          include: [MESSAGES_QUERY],
+        });
+      }
     },
   });
 
@@ -258,6 +297,7 @@ const Chats = () => {
         if (activeFilter === "Unread") return chat.unreadCount > 0;
         if (activeFilter === "Pinned") return chat.pinned;
         if (activeFilter === "Muted") return chat.muted;
+        if (chat.blockedByFriend || chat.blockedByMe) return false;
         return true;
       })
       .sort(
@@ -322,7 +362,7 @@ const Chats = () => {
     if (
       !selectedChat ||
       !message.trim() ||
-      selectedChat.blockedByFriend ||
+      isBlocked(selectedChat) ||
       recording ||
       !currentUser
     )
@@ -384,21 +424,32 @@ const Chats = () => {
             if (!existing) return { messages: [sentMsg] };
             if (existing.messages.some((m) => m.id === sentMsg.id))
               return existing;
-            return {
-              ...existing,
-              messages: [...existing.messages, sentMsg],
-            };
+            return { ...existing, messages: [...existing.messages, sentMsg] };
           },
         );
+
+        cache.updateQuery<ChatQueryData>({ query: CHATS_QUERY }, (existing) => {
+          if (!existing) return existing;
+          return {
+            chats: existing.chats.map((chat) =>
+              chat.id === selectedChat.id
+                ? {
+                    ...chat,
+                    preview: content,
+                    lastMessageAt: sentMsg.createdAt,
+                  }
+                : chat,
+            ),
+          };
+        });
       },
-      refetchQueries: [{ query: CHATS_QUERY }],
     });
   };
 
   const sendAttachment = async (file: File) => {
     if (
       !selectedChat ||
-      selectedChat.blockedByFriend ||
+      isBlocked(selectedChat) ||
       !(file.type.startsWith("image/") || file.type.startsWith("video/"))
     )
       return;
@@ -414,6 +465,24 @@ const Chats = () => {
         replyToId: replyId,
         attachmentId,
       },
+      update: (cache, { data }) => {
+        const sentMsg = data?.sendMessage;
+        if (!sentMsg) return;
+        cache.updateQuery<ChatQueryData>({ query: CHATS_QUERY }, (existing) => {
+          if (!existing) return existing;
+          return {
+            chats: existing.chats.map((chat) =>
+              chat.id === selectedChat.id
+                ? {
+                    ...chat,
+                    preview: type.toLowerCase(),
+                    lastMessageAt: sentMsg.createdAt,
+                  }
+                : chat,
+            ),
+          };
+        });
+      },
       refetchQueries: [
         { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
         { query: MEDIA_QUERY, variables: { chatId: selectedChat.id } },
@@ -426,7 +495,7 @@ const Chats = () => {
   const startRecording = async () => {
     if (
       !selectedChat ||
-      selectedChat.blockedByFriend ||
+      isBlocked(selectedChat) ||
       recording ||
       !navigator.mediaDevices?.getUserMedia
     )
@@ -487,6 +556,27 @@ const Chats = () => {
             type: "AUDIO",
             replyToId: reply?.id ?? null,
             attachmentId,
+          },
+          update: (cache, { data }) => {
+            const sentMsg = data?.sendMessage;
+            if (!sentMsg) return;
+            cache.updateQuery<ChatQueryData>(
+              { query: CHATS_QUERY },
+              (existing) => {
+                if (!existing) return existing;
+                return {
+                  chats: existing.chats.map((chat) =>
+                    chat.id === selectedChat.id
+                      ? {
+                          ...chat,
+                          preview: "audio",
+                          lastMessageAt: sentMsg.createdAt,
+                        }
+                      : chat,
+                  ),
+                };
+              },
+            );
           },
           refetchQueries: [
             { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
@@ -553,7 +643,16 @@ const Chats = () => {
     }
   };
 
-  const isBlocked = (chat: Chat) => Boolean(chat.blockedByFriend);
+  const makeCall = async (type: "audio" | "video") => {
+    if (!selectedChat || isBlocked(selectedChat)) return;
+    const result = await startCall({
+      variables: { userId: selectedChat.friend.id, type },
+    });
+    if (result.data?.startCall) setCall(result.data.startCall, false);
+  };
+
+  const isBlocked = (chat: Chat) =>
+    Boolean(chat.blockedByFriend || chat.blockedByMe);
 
   const SKELETON_COUNT = 12;
 
@@ -655,10 +754,18 @@ const Chats = () => {
               </div>
 
               <div className="conversation-actions">
-                <button title="Audio call">
+                <button
+                  title="Audio call"
+                  onClick={() => void makeCall("audio")}
+                  disabled={isBlocked(selectedChat)}
+                >
                   <Phone size={23} />
                 </button>
-                <button title="Video call">
+                <button
+                  title="Video call"
+                  onClick={() => void makeCall("video")}
+                  disabled={isBlocked(selectedChat)}
+                >
                   <Video size={23} />
                 </button>
                 <button
@@ -836,12 +943,15 @@ const Chats = () => {
                   }
                   onKeyDown={handleKeyDown}
                   placeholder={
-                    isBlocked(selectedChat)
-                      ? "You cannot message this user"
-                      : "Type a message..."
+                    selectedChat.blockedByMe
+                      ? "You blocked this user"
+                      : selectedChat.blockedByFriend
+                        ? "This user blocked you"
+                        : "Type a message..."
                   }
                   rows={1}
                   readOnly={recording || isBlocked(selectedChat)}
+                  disabled={isBlocked(selectedChat)}
                 />
 
                 <div className="composer-actions">
@@ -873,8 +983,9 @@ const Chats = () => {
 
               {isBlocked(selectedChat) && (
                 <div className="blocked-chat-notice">
-                  This user has blocked you. Sending messages and media is
-                  disabled.
+                  {selectedChat.blockedByMe
+                    ? "You blocked this user."
+                    : "This user blocked you."}
                 </div>
               )}
             </div>
@@ -922,12 +1033,20 @@ const Chats = () => {
             </section>
 
             <section className="details-bubble action-bubble">
-              <button className="profile-action">
+              <button
+                className="profile-action"
+                onClick={() => void makeCall("audio")}
+                disabled={isBlocked(selectedChat)}
+              >
                 <Phone size={25} />
                 <span>Audio Call</span>
               </button>
 
-              <button className="profile-action">
+              <button
+                className="profile-action"
+                onClick={() => void makeCall("video")}
+                disabled={isBlocked(selectedChat)}
+              >
                 <Video size={25} />
                 <span>Video Call</span>
               </button>
@@ -1022,14 +1141,32 @@ const Chats = () => {
               <button
                 className="block-button"
                 onClick={async () => {
-                  await blockUser({
-                    variables: { userId: selectedChat.friend.id },
-                  });
-                  setShowDetails(false);
+                  const userId = selectedChat.friend.id;
+                  const blockedByMe = Boolean(selectedChat.blockedByMe);
+                  if (blockedByMe) {
+                    await unblockUser({ variables: { userId } });
+                  } else {
+                    await blockUser({ variables: { userId } });
+                  }
+                  client.cache.updateQuery<ChatQueryData>(
+                    { query: CHATS_QUERY },
+                    (existing) => {
+                      if (!existing) return existing;
+                      return {
+                        chats: existing.chats.map((chat) =>
+                          chat.id === selectedChat.id
+                            ? { ...chat, blockedByMe: !blockedByMe }
+                            : chat,
+                        ),
+                      };
+                    },
+                  );
                 }}
               >
-                <Ban size={22} />
-                <span>Block Friend</span>
+                {selectedChat.blockedByMe ? <X size={22} /> : <Ban size={22} />}
+                <span>
+                  {selectedChat.blockedByMe ? "Unblock" : "Block Friend"}
+                </span>
               </button>
             </section>
           </>
