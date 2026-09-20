@@ -18,7 +18,7 @@ export default defineConfig({
         description:
           "A messaging application where you can discover new people",
         theme_color: "#2563eb",
-        background_color: "#ffffff",
+        background_color: "#2563eb",
         display: "standalone",
         start_url: "/",
         icons: [
