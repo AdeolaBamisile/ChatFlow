@@ -2837,77 +2837,47 @@
   cursor: not-allowed;
 }
 
-
-/* === MOBILE OPTIMIZATION FIX === */
-html, body {
+html,
+body {
   height: 100%;
   overflow-x: hidden;
 }
 
 body {
-  overscroll-behavior-y: auto; /* allow pull-to-refresh */
+  overscroll-behavior-y: auto;
 }
 
-#root, .app, .container {
+#root,
+.app,
+.container {
   min-height: 100vh;
-  min-height: 100dvh; /* dynamic viewport for mobile */
+  min-height: 100dvh;
   width: 100%;
   overflow-x: hidden;
 }
 
-/* Fix bottom nav overlap (safe area) */
-.main-content, .chat-container, .page {
+.main-content,
+.chat-container,
+.page {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Prevent cropping from fixed elements */
 * {
   box-sizing: border-box;
 }
 
-/* Responsive fix */
 @media (max-width: 768px) {
-  html, body {
+  html,
+  body {
     width: 100%;
     overflow-x: hidden;
   }
 
-  .app, .container, .chat-container, .page {
+  .app,
+  .container,
+  .chat-container,
+  .page {
     width: 100%;
     max-width: 100%;
   }
-}
-
-
-/* === CHAT LAYOUT FIX (STICKY HEADER + INPUT) === */
-
-/* Chat container layout */
-.chat-container, .gemini-container {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
-}
-
-/* Header stays at top */
-.chat-header, .gemini-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-/* Messages scroll area */
-.chat-messages, .gemini-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding-bottom: 10px;
-}
-
-/* Input stays at bottom */
-.chat-input, .gemini-input {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  background: inherit;
-  padding-bottom: env(safe-area-inset-bottom);
 }

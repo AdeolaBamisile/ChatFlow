@@ -516,37 +516,3 @@
     width: 7.5%;
   }
 }
-
-
-/* === CHAT LAYOUT FIX (STICKY HEADER + INPUT) === */
-
-/* Chat container layout */
-.chat-container, .gemini-container {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
-}
-
-/* Header stays at top */
-.chat-header, .gemini-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-/* Messages scroll area */
-.chat-messages, .gemini-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding-bottom: 10px;
-}
-
-/* Input stays at bottom */
-.chat-input, .gemini-input {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  background: inherit;
-  padding-bottom: env(safe-area-inset-bottom);
-}
