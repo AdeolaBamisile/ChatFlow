@@ -236,6 +236,13 @@ export const SEND_MESSAGE_MUTATION = gql`
   }
 `;
 
+
+export const MARK_MESSAGES_SEEN_MUTATION = gql`
+  mutation MarkMessagesSeen($chatId: ID!) {
+    markMessagesSeen(chatId: $chatId)
+  }
+`;
+
 export const DELETE_MESSAGE_MUTATION = gql`
   mutation DeleteMessage($messageId: ID!) {
     deleteMessage(messageId: $messageId)

@@ -867,6 +867,52 @@ const resolver = {
       return view;
     },
 
+    markMessagesSeen: async (
+      _root: unknown,
+      { chatId }: { chatId: string },
+      { currentUser }: Context,
+    ) => {
+      const user = requireUser(currentUser);
+      const chat = await getChatForUser(chatId, user.id);
+
+      const unseenMessages = await Message.findAll({
+        where: {
+          chatId: chat.id,
+          senderId: { [Op.ne]: user.id },
+          seen: false,
+        },
+      });
+
+      if (unseenMessages.length) {
+        await Message.update(
+          { seen: true },
+          {
+            where: {
+              chatId: chat.id,
+              senderId: { [Op.ne]: user.id },
+              seen: false,
+            },
+          },
+        );
+
+        for (const message of unseenMessages) {
+          message.seen = true;
+          await pubsub.publish(`CHAT_MESSAGE_${chat.id}`, {
+            chatMessageAdded: await messageView(message),
+          });
+        }
+      }
+
+      await ChatMember.update(
+        { unreadCount: 0 },
+        { where: { chatId: chat.id, userId: user.id } },
+      );
+
+      await publishChat(chat.id, [user.id, (await getFriendFromChat(chat.id, user.id)).id]);
+
+      return true;
+    },
+
     deleteMessage: async (
       _root: unknown,
       { messageId }: { messageId: string },

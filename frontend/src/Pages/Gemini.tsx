@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 
 import { Send } from "lucide-react";
+import Spinner from "../Components/Spinner";
 
 import {
   GEMINI_MESSAGE_SUBSCRIPTION,
@@ -18,8 +19,9 @@ const Gemini = () => {
   const [messages, setMessages] = useState<GeminiMessage[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasLoadedInitialHistory = useRef(false);
 
-  const { data } = useQuery<{ geminiMessages: GeminiMessage[] }>(
+  const { data, loading } = useQuery<{ geminiMessages: GeminiMessage[] }>(
     GEMINI_MESSAGES_QUERY,
   );
 
@@ -28,7 +30,10 @@ const Gemini = () => {
   );
 
   useEffect(() => {
-    if (data?.geminiMessages) setMessages(data.geminiMessages);
+    if (data?.geminiMessages) {
+      setMessages(data.geminiMessages);
+      hasLoadedInitialHistory.current = true;
+    }
   }, [data]);
 
   useEffect(() => {
@@ -98,31 +103,15 @@ const Gemini = () => {
             </div>
           </header>
 
-          <div className="chat-content">
-            <div className="date-divider">
-              <span>Today</span>
+          {loading && !hasLoadedInitialHistory.current ? (
+            <div className="gemini-loading-state">
+              <Spinner size={32} thickness={5} color="#dbdbdb" />
+              Loading Conversations...
             </div>
-
-            {!messages.length && (
-              <div className="gemini-empty-state">
-                <div className="gemini-avatar">
-                  <img
-                    className="chatGeminiIcon"
-                    src="https://rholprurkjaqsgdwywid.supabase.co/storage/v1/object/public/testing/projectImagesVideos/Gemini-Icon.png"
-                    alt="Gemini"
-                  />
-                </div>
-                <h2>Ask Gemini anything</h2>
-                <p>Your messages and Gemini's responses will appear here.</p>
-              </div>
-            )}
-
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`gemini-message-row ${msg.sender === "user" ? "sent" : "received"}`}
-              >
-                {msg.sender === "gemini" && (
+          ) : (
+            <div className="chat-content">
+              {!messages.length && (
+                <div className="gemini-empty-state">
                   <div className="gemini-avatar">
                     <img
                       className="chatGeminiIcon"
@@ -130,26 +119,45 @@ const Gemini = () => {
                       alt="Gemini"
                     />
                   </div>
-                )}
+                  <h2>Ask Gemini anything</h2>
+                  <p>Your messages and Gemini's responses will appear here.</p>
+                </div>
+              )}
 
+              {messages.map((msg) => (
                 <div
-                  className={`gemini-bubble ${msg.sender === "user" ? "gemini-bubble-user" : "gemini-bubble-bot"}`}
+                  key={msg.id}
+                  className={`gemini-message-row ${msg.sender === "user" ? "sent" : "received"}`}
                 >
-                  <p>{msg.content}</p>
-                  <div className="message-meta">
-                    <small>
-                      {new Date(msg.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </small>
+                  {msg.sender === "gemini" && (
+                    <div className="gemini-avatar">
+                      <img
+                        className="chatGeminiIcon"
+                        src="https://rholprurkjaqsgdwywid.supabase.co/storage/v1/object/public/testing/projectImagesVideos/Gemini-Icon.png"
+                        alt="Gemini"
+                      />
+                    </div>
+                  )}
+
+                  <div
+                    className={`gemini-bubble ${msg.sender === "user" ? "gemini-bubble-user" : "gemini-bubble-bot"}`}
+                  >
+                    <p>{msg.content}</p>
+                    <div className="message-meta">
+                      <small>
+                        {new Date(msg.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </small>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            <div ref={messagesEndRef} />
-          </div>
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </section>
 
         <div className="gemini-composer-wrapper">

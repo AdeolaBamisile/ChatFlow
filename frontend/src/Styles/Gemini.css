@@ -101,6 +101,30 @@
   scrollbar-color: #202b38 transparent;
 }
 
+.gemini-chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 6px 4px 14px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #202b38 transparent;
+}
+
+.gemini-loading-state {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #8b95a4;
+  font-size: 14px;
+}
+
 .gemini-chat::-webkit-scrollbar {
   width: 6px;
 }

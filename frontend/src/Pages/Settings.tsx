@@ -6,6 +6,8 @@ import { useApolloClient } from "@apollo/client/react";
 
 import PrivacyRow from "../Components/SettingsSpecific/PrivacyRow";
 
+import Spinner from "../Components/Spinner";
+
 import {
   BLOCKED_USERS_QUERY,
   CHANGE_EMAIL_MUTATION,
@@ -127,20 +129,25 @@ const Settings = () => {
     blockedUsers: BlockedUser[];
   }>(BLOCKED_USERS_QUERY, { skip: activeSection !== "blocked" });
 
-  const [updateProfile] = useMutation<{ updateProfile: CurrentUser }>(
-    UPDATE_PROFILE_MUTATION,
-  );
+  const [updateProfile, { loading: profileLoading }] = useMutation<{
+    updateProfile: CurrentUser;
+  }>(UPDATE_PROFILE_MUTATION);
 
   const [updatePrivacy] = useMutation<UpdatePrivacyData>(
     UPDATE_PRIVACY_MUTATION,
   );
-  const [unblock] = useMutation(UNBLOCK_USER_MUTATION);
-  const [changePassword] = useMutation(CHANGE_PASSWORD_MUTATION);
-  const [changeEmail] = useMutation<ChangeEmailData>(CHANGE_EMAIL_MUTATION);
-  const [deleteAccount] = useMutation(DELETE_ACCOUNT_MUTATION);
-  const [prepareProfileUpload] = useMutation<PrepareProfileUploadData>(
-    PREPARE_PROFILE_UPLOAD_MUTATION,
+  const [unblock, { loading: unblockLoading }] = useMutation(
+    UNBLOCK_USER_MUTATION,
   );
+  const [changePassword, { loading: passwordLoading }] = useMutation(
+    CHANGE_PASSWORD_MUTATION,
+  );
+  const [changeEmail, { loading: emailLoading }] = useMutation<ChangeEmailData>(
+    CHANGE_EMAIL_MUTATION,
+  );
+  const [deleteAccount] = useMutation(DELETE_ACCOUNT_MUTATION);
+  const [prepareProfileUpload, { loading: prepareLoading }] =
+    useMutation<PrepareProfileUploadData>(PREPARE_PROFILE_UPLOAD_MUTATION);
 
   useEffect(() => {
     if (meData?.me) setCurrentUser(meData.me);
@@ -258,8 +265,15 @@ const Settings = () => {
     client.resetStore();
   };
 
+  const loading = unblockLoading || prepareLoading;
+
   return (
     <div className="settings-page">
+      {loading && (
+        <div className="spinner-container">
+          <Spinner thickness={5} color="#dbdbdb" />
+        </div>
+      )}
       <header className="settings-page-header">
         <div>
           <h1>Settings</h1>
@@ -391,7 +405,14 @@ const Settings = () => {
                     className="primary-settings-button"
                     onClick={() => void saveProfile()}
                   >
-                    Save Changes
+                    {profileLoading ? (
+                      <div className="loading-button">
+                        <Spinner size={18} thickness={3} color="currentColor" />
+                        Loading
+                      </div>
+                    ) : (
+                      "Save Changes"
+                    )}
                   </button>
                 </div>
               </div>
@@ -588,7 +609,14 @@ const Settings = () => {
                       setStatusMessage("Email updated successfully.");
                     }}
                   >
-                    Change Email Address
+                    {emailLoading ? (
+                      <div className="loading-button">
+                        <Spinner size={18} thickness={3} color="currentColor" />
+                        Loading
+                      </div>
+                    ) : (
+                      "Change Email Address"
+                    )}
                   </button>
 
                   <div className="account-divider" />
@@ -624,7 +652,14 @@ const Settings = () => {
                       setStatusMessage("Password updated successfully.");
                     }}
                   >
-                    Change Password
+                    {passwordLoading ? (
+                      <div className="loading-button">
+                        <Spinner size={18} thickness={3} color="currentColor" />
+                        Loading
+                      </div>
+                    ) : (
+                      "Change Password"
+                    )}
                   </button>
                 </div>
               </div>

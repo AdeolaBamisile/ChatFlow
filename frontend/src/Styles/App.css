@@ -221,6 +221,13 @@ button {
   }
 }
 
+.loading-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .light-mode {
   --background: #edf1f7;
   --surface: #f8f9fb;

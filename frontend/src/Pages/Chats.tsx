@@ -41,11 +41,13 @@ import {
   START_CALL_MUTATION,
   UNBLOCK_USER_MUTATION,
   UPDATE_CHAT_MUTATION,
+  MARK_MESSAGES_SEEN_MUTATION,
 } from "../services/graphql";
 
 import UserButton from "../Components/ChatsSpecific/UserButton";
 import FilterButtons from "../Components/ChatsSpecific/FilterButtons";
 import { MessageBubble } from "../Components/ChatsSpecific/MessageBubble";
+import Spinner from "../Components/Spinner";
 
 import { useAppStore, useCurrentUser } from "../store";
 import { useMediaUpload } from "../services/media";
@@ -114,6 +116,7 @@ const Chats = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
+  const loadedMessageChatsRef = useRef<Set<string>>(new Set());
 
   const { chatId } = useParams<{ chatId: string }>();
   const currentUser = useCurrentUser();
@@ -139,11 +142,12 @@ const Chats = () => {
     [activeChat, chatId, chats],
   );
 
-  const { data: messagesData } = useQuery<MessagesData>(MESSAGES_QUERY, {
-    variables: { chatId: selectedChat?.id ?? "" },
-    skip: !selectedChat,
-    fetchPolicy: "cache-and-network",
-  });
+  const { data: messagesData, loading: messagesLoading } =
+    useQuery<MessagesData>(MESSAGES_QUERY, {
+      variables: { chatId: selectedChat?.id ?? "" },
+      skip: !selectedChat,
+      fetchPolicy: "cache-and-network",
+    });
 
   const { data: mediaData } = useQuery<MediaData>(MEDIA_QUERY, {
     variables: { chatId: selectedChat?.id ?? "" },
@@ -173,6 +177,9 @@ const Chats = () => {
   const [blockUser] = useMutation(BLOCK_USER_MUTATION);
   const [unblockUser] = useMutation(UNBLOCK_USER_MUTATION);
   const [startCall] = useMutation<{ startCall: CallInfo }>(START_CALL_MUTATION);
+  const [markMessagesSeen] = useMutation<{ markMessagesSeen: boolean }>(
+    MARK_MESSAGES_SEEN_MUTATION,
+  );
 
   const [sendGemini] = useMutation<SendGeminiMessageData>(
     SEND_GEMINI_MESSAGE_MUTATION,
@@ -212,7 +219,12 @@ const Chats = () => {
           if (!existingData) return { messages: [newMessage] };
 
           if (existingData.messages.some((m) => m.id === newMessage.id)) {
-            return existingData;
+            return {
+              ...existingData,
+              messages: existingData.messages.map((m) =>
+                m.id === newMessage.id ? newMessage : m,
+              ),
+            };
           }
 
           const filtered = existingData.messages.filter(
@@ -253,17 +265,23 @@ const Chats = () => {
         },
       );
 
-      if (selectedChat?.id === updated.id) {
-        void client.refetchQueries({
-          include: [MESSAGES_QUERY],
-        });
-      }
+
     },
   });
 
   useEffect(() => {
     if (selectedChat) setActiveChat(selectedChat);
   }, [selectedChat]);
+
+  useEffect(() => {
+    if (!selectedChat?.id || !isChatRoute || !messagesData || messagesLoading) return;
+
+    loadedMessageChatsRef.current.add(selectedChat.id);
+
+    if (messages.some((item) => item.senderId !== currentUser?.id && !item.seen)) {
+      void markMessagesSeen({ variables: { chatId: selectedChat.id } });
+    }
+  }, [currentUser?.id, isChatRoute, markMessagesSeen, messages, messagesData, messagesLoading, selectedChat?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
@@ -297,7 +315,7 @@ const Chats = () => {
         if (activeFilter === "Unread") return chat.unreadCount > 0;
         if (activeFilter === "Pinned") return chat.pinned;
         if (activeFilter === "Muted") return chat.muted;
-        if (chat.blockedByFriend || chat.blockedByMe) return false;
+        if (chat.blockedByMe) return false;
         return true;
       })
       .sort(
@@ -468,26 +486,25 @@ const Chats = () => {
       update: (cache, { data }) => {
         const sentMsg = data?.sendMessage;
         if (!sentMsg) return;
+        cache.updateQuery<MessagesData>(
+          { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
+          (existing) => {
+            if (!existing) return { messages: [sentMsg] };
+            if (existing.messages.some((item) => item.id === sentMsg.id)) return existing;
+            return { messages: [...existing.messages, sentMsg] };
+          },
+        );
         cache.updateQuery<ChatQueryData>({ query: CHATS_QUERY }, (existing) => {
           if (!existing) return existing;
           return {
             chats: existing.chats.map((chat) =>
               chat.id === selectedChat.id
-                ? {
-                    ...chat,
-                    preview: type.toLowerCase(),
-                    lastMessageAt: sentMsg.createdAt,
-                  }
+                ? { ...chat, preview: type.toLowerCase(), lastMessageAt: sentMsg.createdAt }
                 : chat,
             ),
           };
         });
       },
-      refetchQueries: [
-        { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
-        { query: MEDIA_QUERY, variables: { chatId: selectedChat.id } },
-        { query: CHATS_QUERY },
-      ],
     });
     setReply(null);
   };
@@ -560,28 +577,25 @@ const Chats = () => {
           update: (cache, { data }) => {
             const sentMsg = data?.sendMessage;
             if (!sentMsg) return;
-            cache.updateQuery<ChatQueryData>(
-              { query: CHATS_QUERY },
+            cache.updateQuery<MessagesData>(
+              { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
               (existing) => {
-                if (!existing) return existing;
-                return {
-                  chats: existing.chats.map((chat) =>
-                    chat.id === selectedChat.id
-                      ? {
-                          ...chat,
-                          preview: "audio",
-                          lastMessageAt: sentMsg.createdAt,
-                        }
-                      : chat,
-                  ),
-                };
+                if (!existing) return { messages: [sentMsg] };
+                if (existing.messages.some((item) => item.id === sentMsg.id)) return existing;
+                return { messages: [...existing.messages, sentMsg] };
               },
             );
+            cache.updateQuery<ChatQueryData>({ query: CHATS_QUERY }, (existing) => {
+              if (!existing) return existing;
+              return {
+                chats: existing.chats.map((chat) =>
+                  chat.id === selectedChat.id
+                    ? { ...chat, preview: "audio", lastMessageAt: sentMsg.createdAt }
+                    : chat,
+                ),
+              };
+            });
           },
-          refetchQueries: [
-            { query: MESSAGES_QUERY, variables: { chatId: selectedChat.id } },
-            { query: CHATS_QUERY },
-          ],
         });
         setReply(null);
       } finally {
@@ -816,77 +830,84 @@ const Chats = () => {
               </div>
             )}
 
-            <div
-              className="messages-container"
-              onScroll={(event) => {
-                const element = event.currentTarget;
-                setShowScrollToBottom(
-                  element.scrollHeight -
-                    element.scrollTop -
-                    element.clientHeight >
-                    120,
-                );
-              }}
-            >
-              <div className="date-divider">
-                <span>Today</span>
+            {messagesLoading && selectedChat && !loadedMessageChatsRef.current.has(selectedChat.id) ? (
+              <div className="messages-loading-state">
+                <Spinner size={32} thickness={5} color="#dbdbdb" />
+                Loading Conversations...
               </div>
-              {messages
-                .filter((item) => !item.deleted)
-                .map((item) => (
-                  <MessageBubble
-                    key={item.id}
-                    message={item}
-                    isMine={item.senderId === currentUser?.id}
-                    active={activeMessageId === item.id}
-                    onToggleActions={(id) =>
-                      setActiveMessageId((current) =>
-                        current === id ? null : id,
-                      )
-                    }
-                    onReply={(value) => {
-                      setReply(value);
-                      setActiveMessageId(null);
-                    }}
-                    onReact={async (id, emoji) => {
-                      await reactMessage({
-                        variables: { messageId: id, emoji },
-                        refetchQueries: [
-                          {
-                            query: MESSAGES_QUERY,
-                            variables: { chatId: selectedChat.id },
-                          },
-                        ],
-                      });
-                      setActiveMessageId(null);
-                    }}
-                    onDelete={async (id) => {
-                      await deleteMessage({
-                        variables: { messageId: id },
-                        refetchQueries: [
-                          {
-                            query: MESSAGES_QUERY,
-                            variables: { chatId: selectedChat.id },
-                          },
-                        ],
-                      });
-                      setActiveMessageId(null);
-                    }}
-                  />
-                ))}
+            ) : (
+              <div
+                className="messages-container"
+                onScroll={(event) => {
+                  const element = event.currentTarget;
+                  setShowScrollToBottom(
+                    element.scrollHeight -
+                      element.scrollTop -
+                      element.clientHeight >
+                      120,
+                  );
+                }}
+              >
+                <div className="date-divider">
+                  <span>Today</span>
+                </div>
+                {messages
+                  .filter((item) => !item.deleted)
+                  .map((item) => (
+                    <MessageBubble
+                      key={item.id}
+                      message={item}
+                      isMine={item.senderId === currentUser?.id}
+                      active={activeMessageId === item.id}
+                      onToggleActions={(id) =>
+                        setActiveMessageId((current) =>
+                          current === id ? null : id,
+                        )
+                      }
+                      onReply={(value) => {
+                        setReply(value);
+                        setActiveMessageId(null);
+                      }}
+                      onReact={async (id, emoji) => {
+                        await reactMessage({
+                          variables: { messageId: id, emoji },
+                          refetchQueries: [
+                            {
+                              query: MESSAGES_QUERY,
+                              variables: { chatId: selectedChat.id },
+                            },
+                          ],
+                        });
+                        setActiveMessageId(null);
+                      }}
+                      onDelete={async (id) => {
+                        await deleteMessage({
+                          variables: { messageId: id },
+                          refetchQueries: [
+                            {
+                              query: MESSAGES_QUERY,
+                              variables: { chatId: selectedChat.id },
+                            },
+                          ],
+                        });
+                        setActiveMessageId(null);
+                      }}
+                    />
+                  ))}
 
-              <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} />
 
-              {showScrollToBottom && (
-                <button
-                  className="scroll-to-bottom-button"
-                  onClick={scrollToBottom}
-                  title="Scroll to newest message"
-                >
-                  <ChevronDown size={21} />
-                </button>
-              )}
-            </div>
+                {showScrollToBottom && (
+                  <button
+                    className="scroll-to-bottom-button"
+                    onClick={scrollToBottom}
+                    title="Scroll to newest message"
+                  >
+                    <ChevronDown size={21} />
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className={`message-composer ${reply ? "replying" : ""}`}>
               {reply && (

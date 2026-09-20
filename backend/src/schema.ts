@@ -153,6 +153,7 @@ const typeDefs = /* GraphQL */ `
       replyToId: ID
       attachmentId: ID
     ): Message!
+    markMessagesSeen(chatId: ID!): Boolean!
     deleteMessage(messageId: ID!): Boolean!
     reactToMessage(messageId: ID!, emoji: String!): Reaction!
     updateChat(chatId: ID!, pinned: Boolean, muted: Boolean): Chat!
