@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import {
+  useApolloClient,
+  useMutation,
+  useQuery,
+  useSubscription,
+} from "@apollo/client/react";
 
 import {
   Route,
@@ -42,19 +47,11 @@ import type { CallInfo, CurrentUser } from "./types";
 import CallOverlay from "./Components/CallOverlay";
 
 const Logo = () => (
-  <img
-    src="https://rholprurkjaqsgdwywid.supabase.co/storage/v1/object/public/testing/projectImagesVideos/logo.png"
-    alt="ChatFlow"
-    className="brand-logo"
-  />
+  <img src="../logo.png" alt="ChatFlow" className="brand-logo" />
 );
 
 const GeminiIcon = () => (
-  <img
-    className="gemini"
-    src="https://rholprurkjaqsgdwywid.supabase.co/storage/v1/object/public/testing/projectImagesVideos/Gemini-Icon.png"
-    alt="Gemini"
-  />
+  <img className="gemini" src="../Gemini-Icon.png" alt="Gemini" />
 );
 
 const App = () => {
@@ -87,23 +84,29 @@ const App = () => {
     login: { token: string; user: CurrentUser };
   }>(LOGIN_MUTATION);
 
-  useSubscription<{ userPresenceChanged: CurrentUser }>(USER_PRESENCE_SUBSCRIPTION, {
-    skip: !currentUser,
-    onData: ({ data }) => {
-      const user = data.data?.userPresenceChanged;
-      if (!user) return;
+  useSubscription<{ userPresenceChanged: CurrentUser }>(
+    USER_PRESENCE_SUBSCRIPTION,
+    {
+      skip: !currentUser,
+      onData: ({ data }) => {
+        const user = data.data?.userPresenceChanged;
+        if (!user) return;
 
-      const cacheId = client.cache.identify({ __typename: "User", id: user.id });
-      if (cacheId) {
-        client.cache.modify({
-          id: cacheId,
-          fields: {
-            online: () => user.online,
-          },
+        const cacheId = client.cache.identify({
+          __typename: "User",
+          id: user.id,
         });
-      }
+        if (cacheId) {
+          client.cache.modify({
+            id: cacheId,
+            fields: {
+              online: () => user.online,
+            },
+          });
+        }
+      },
     },
-  });
+  );
 
   useSubscription<{ incomingCall: CallInfo }>(INCOMING_CALL_SUBSCRIPTION, {
     skip: !currentUser,

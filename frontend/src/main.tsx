@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter as Router } from "react-router-dom";
+import { registerSW } from "virtual:pwa-register";
 
 import App from "./App";
 
@@ -42,7 +43,6 @@ const getWsUrl = () => {
   const host = window.location.host;
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
-  console.log(`${protocol}//${host}/graphql`);
   return `${protocol}//${host}/graphql`;
 };
 
@@ -70,6 +70,13 @@ const splitLink = ApolloLink.split(
 const client = new ApolloClient({
   link: splitLink,
   cache: new InMemoryCache(),
+});
+
+registerSW({
+  immediate: true,
+  onOfflineReady() {
+    console.log("ChatFlow is ready to work offline");
+  },
 });
 
 createRoot(document.getElementById("root")!).render(
