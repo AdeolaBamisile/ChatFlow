@@ -2836,3 +2836,44 @@
   color: #858e9d;
   cursor: not-allowed;
 }
+
+
+/* === MOBILE OPTIMIZATION FIX === */
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  overscroll-behavior-y: auto; /* allow pull-to-refresh */
+}
+
+#root, .app, .container {
+  min-height: 100vh;
+  min-height: 100dvh; /* dynamic viewport for mobile */
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix bottom nav overlap (safe area) */
+.main-content, .chat-container, .page {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Prevent cropping from fixed elements */
+* {
+  box-sizing: border-box;
+}
+
+/* Responsive fix */
+@media (max-width: 768px) {
+  html, body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .app, .container, .chat-container, .page {
+    width: 100%;
+    max-width: 100%;
+  }
+}
