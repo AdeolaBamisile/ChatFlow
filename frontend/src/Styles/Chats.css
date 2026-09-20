@@ -29,7 +29,7 @@
 }
 
 .details-panel {
-  height: calc(100vh - 24px);
+  height: calc(100dvh - 24px);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -110,7 +110,7 @@
 }
 
 .chat-list-panel {
-  height: calc(100vh - 24px);
+  height: calc(100dvh - 24px);
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -434,7 +434,7 @@
 }
 
 .conversation-panel {
-  height: calc(100vh - 24px);
+  height: calc(100dvh - 24px);
   min-width: 0;
   position: relative;
   display: flex;
@@ -2607,7 +2607,7 @@
   }
   .media-overlay-panel {
     width: 100%;
-    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
   }
   .media-overlay-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2616,10 +2616,6 @@
     padding: 10px;
   }
 }
-
-/* =====================================================
-   CALL OVERLAY
-====================================================== */
 .call-overlay {
   position: fixed;
   inset: 0;
@@ -2806,7 +2802,7 @@
   }
 
   .call-overlay-panel {
-    min-height: calc(100vh - 20px);
+    min-height: calc(100dvh - 20px);
     border-radius: 22px;
   }
 
@@ -2837,47 +2833,40 @@
   cursor: not-allowed;
 }
 
+/* === GLOBAL MOBILE FIX === */
 html,
-body {
+body,
+#root {
   height: 100%;
-  overflow-x: hidden;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-body {
-  overscroll-behavior-y: auto;
-}
-
-#root,
-.app,
-.container {
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  overflow-x: hidden;
-}
-
-.main-content,
 .chat-container,
-.page {
+.gemini-container {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.chat-header,
+.gemini-header {
+  flex-shrink: 0;
+}
+
+.chat-messages,
+.gemini-messages {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-input,
+.gemini-input {
+  flex-shrink: 0;
   padding-bottom: env(safe-area-inset-bottom);
-}
-
-* {
-  box-sizing: border-box;
-}
-
-@media (max-width: 768px) {
-  html,
-  body {
-    width: 100%;
-    overflow-x: hidden;
-  }
-
-  .app,
-  .container,
-  .chat-container,
-  .page {
-    width: 100%;
-    max-width: 100%;
-  }
+  background: inherit;
 }

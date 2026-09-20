@@ -55,7 +55,7 @@ button {
 
 .app-shell {
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   display: grid;
   grid-template-columns: 82px minmax(0, 1fr);
   gap: 14px;
@@ -67,7 +67,7 @@ button {
 
 .navigation-rail {
   width: 82px;
-  height: calc(100vh - 20px);
+  height: calc(100dvh - 20px);
   border: 1px solid var(--border);
   border-radius: 18px;
   background: linear-gradient(180deg, #0b131d 0%, #09111a 100%);
@@ -178,7 +178,7 @@ button {
 .page-content {
   min-width: 0;
   min-height: 0;
-  height: calc(100vh - 20px);
+  height: calc(100dvh - 20px);
   overflow: hidden;
   position: relative;
 }
@@ -196,7 +196,7 @@ button {
 .spinner-container {
   position: fixed;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
@@ -263,11 +263,11 @@ button {
 
   .navigation-rail {
     width: 76px;
-    height: calc(100vh - 16px);
+    height: calc(100dvh - 16px);
   }
 
   .page-content {
-    height: calc(100vh - 16px);
+    height: calc(100dvh - 16px);
   }
 }
 
@@ -275,7 +275,7 @@ button {
   .app-shell {
     display: block;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     padding: 0;
     overflow: hidden;
     background: var(--background);
@@ -291,12 +291,12 @@ button {
 
   .page-content {
     width: 100%;
-    height: calc(100vh - 74px);
+    height: calc(100dvh - 74px);
     overflow: hidden;
   }
 
   .app-shell.person-chat-open .page-content {
-    height: 100vh;
+    height: 100dvh;
   }
 
   .mobile-bottom-navigation {
@@ -443,46 +443,38 @@ button {
 }
 
 html,
-body {
+body,
+#root {
   height: 100%;
-  overflow-x: hidden;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-body {
-  overscroll-behavior-y: auto;
-}
-
-#root,
-.app,
-.container {
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  overflow-x: hidden;
-}
-
-.main-content,
 .chat-container,
-.page {
+.gemini-container {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.chat-header,
+.gemini-header {
+  flex-shrink: 0;
+}
+
+.chat-messages,
+.gemini-messages {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-input,
+.gemini-input {
+  flex-shrink: 0;
   padding-bottom: env(safe-area-inset-bottom);
-}
-
-* {
-  box-sizing: border-box;
-}
-
-@media (max-width: 768px) {
-  html,
-  body {
-    width: 100%;
-    overflow-x: hidden;
-  }
-
-  .app,
-  .container,
-  .chat-container,
-  .page {
-    width: 100%;
-    max-width: 100%;
-  }
+  background: inherit;
 }
